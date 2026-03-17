@@ -1,0 +1,319 @@
+{
+  "common": {
+    "appName": "Industrial Dominion",
+    "shellBadge": "Economic command network"
+  },
+  "shell": {
+    "kicker": "Project shell",
+    "headline": "Command your industrial rise from a single responsive control surface.",
+    "subheadline": "This first frontend shell establishes routing, shared styling, and the core screens we will deepen in later tasks."
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "market": "Market",
+    "onboarding": "Start",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "credits": "Credits",
+    "production": "Output per hour",
+    "inventoryTotal": "Inventory total",
+    "authLoading": "Checking your sign-in session...",
+    "loading": "Loading your dashboard...",
+    "signInRequired": "Sign in from Settings to view your dashboard.",
+    "bootstrapRequired": "Finish onboarding to unlock your first extractor and inventory.",
+    "openOnboarding": "Open onboarding",
+    "extractorTitle": "First extractor",
+    "extractorOutput": "{{amount}} {{resource}} per hour",
+    "claimReady": "{{amount}} {{resource}} ready to claim",
+    "nextClaimAt": "Next claim window: {{date}}",
+    "claimAction": "Claim production",
+    "claiming": "Claiming...",
+    "placeExtractorAction": "Place {{extractor}}",
+    "placingExtractor": "Placing extractor...",
+    "inventoryTitle": "Inventory",
+    "emptyInventory": "Your warehouses are empty. Claim production from your extractor to stock your first resources.",
+    "transformTitle": "Starter processing",
+    "emptyTransforms": "No transform recipes are available for your current starter structure yet.",
+    "transformRecipeLine": "{{inputAmount}} {{inputResource}} -> {{outputAmount}} {{outputResource}}",
+    "transformReadyToStart": "Input inventory is ready. Start the transform batch when you want to process materials.",
+    "transformMissingInput": "Need {{amount}} more {{resource}} to start this transform.",
+    "transformCompletesAt": "Transform completes at: {{date}}",
+    "transformReadyToClaim": "{{outputAmount}} {{outputResource}} ready to claim.",
+    "startTransformAction": "Start transform",
+    "startingTransform": "Starting transform...",
+    "claimTransformAction": "Claim output",
+    "claimingTransform": "Claiming output...",
+    "noExtractor": "Place your first extractor from onboarding to begin production.",
+    "noExtractorShort": "No extractor",
+    "ledgerTitle": "Recent activity",
+    "emptyLedger": "No ledger activity yet. Claim production or sell resources to start your activity feed.",
+    "newsTitle": "System news",
+    "emptyNews": "No system news yet.",
+    "error": "Dashboard error: {{message}}"
+  },
+  "onboarding": {
+    "title": "Choose your region",
+    "subtitle": "Pick the territory that will anchor your first industrial foothold. This step stays light for now, but the choice preview should already feel clear on mobile.",
+    "regionCardLabel": "Starter region",
+    "selectedBadge": "Selected",
+    "selectBadge": "Select",
+    "selectionKicker": "Selection preview",
+    "selectionPreviewTitle": "What this unlocks next",
+    "selectionPreviewBody": "Your chosen region will feed the upcoming player bootstrap flow, starter package grant, and first extractor placement steps.",
+    "confirmRegion": "Lock region for preview",
+    "confirmingRegion": "Locking region...",
+    "selectionHint": "This choice is now saved through the backend bootstrap flow and will stay tied to your signed-in profile.",
+    "authLoading": "Checking your sign-in session...",
+    "signInRequired": "Sign in from Settings before completing onboarding.",
+    "statusLoading": "Loading your bootstrap status...",
+    "completedKicker": "Bootstrap complete",
+    "completedBody": "Your region is locked in and your starter package has been granted. The next onboarding tasks can now place your first extractor.",
+    "openDashboard": "Open dashboard",
+    "alreadyBootstrapped": "This account has already completed bootstrap.",
+    "bootstrapError": "Bootstrap error: {{message}}"
+  },
+  "market": {
+    "title": "Market",
+    "authLoading": "Checking your sign-in session...",
+    "loading": "Loading your market...",
+    "signInRequired": "Sign in from Settings to sell your inventory.",
+    "bootstrapRequired": "Finish onboarding before opening the market.",
+    "openOnboarding": "Open onboarding",
+    "credits": "Credits",
+    "fee": "Market fee",
+    "buyTitle": "Buy resources",
+    "buySubtitle": "Use the system market to purchase raw materials at baseline prices.",
+    "buyOfferLine": "System market offer",
+    "buyQuantity": "Quantity to buy",
+    "buyTotal": "Total cost: {{value}}",
+    "buyBalanceAfter": "Balance after buy: {{value}}",
+    "buyAction": "Buy {{quantity}} {{resource}}",
+    "buying": "Buying...",
+    "buySuccess": "Purchased {{quantity}} {{resource}} for {{cost}}.",
+    "sellTitle": "Sell inventory",
+    "sellSubtitle": "Sell your current stock back to the system market.",
+    "inventoryLine": "{{quantity}} units available",
+    "unitPrice": "Unit price: {{price}}",
+    "netValue": "Sell all net: {{value}}",
+    "sellQuantity": "Quantity to sell",
+    "grossPreview": "Gross: {{value}}",
+    "feePreview": "Fee: {{value}}",
+    "netPreview": "Net: {{value}}",
+    "sellAction": "Sell {{quantity}} {{resource}}",
+    "selling": "Selling...",
+    "sellSuccess": "Sold {{quantity}} {{resource}} for {{credits}} after fees.",
+    "emptyInventory": "You have no inventory ready to sell yet. Claim production from the dashboard first.",
+    "error": "Market error: {{message}}"
+  },
+  "settings": {
+    "title": "Settings",
+    "toggleLanguage": "Switch language",
+    "currentLanguage": "Current language: {{locale}}",
+    "authTitle": "Authentication",
+    "authLoading": "Checking your session...",
+    "signedInAs": "Signed in as {{email}}",
+    "signOut": "Sign out",
+    "emailLabel": "Email address",
+    "emailPlaceholder": "operator@industrialdominion.com",
+    "sendMagicLink": "Send magic link",
+    "linkSent": "Magic link sent. Check your inbox.",
+    "signedOut": "You have been signed out.",
+    "authError": "Authentication error: {{message}}"
+  },
+  "regions": {
+    "ironridge": {
+      "name": "Ironridge",
+      "description": "A hard-edged frontier of ridgelines, foundries, and freight corridors built for early industrial expansion."
+    },
+    "greenhaven": {
+      "name": "Greenhaven",
+      "description": "A fertile logistics basin where farmland, timber routes, and river access support a steady early start."
+    },
+    "sunbarrel": {
+      "name": "Sunbarrel",
+      "description": "A dry extraction belt with strong energy potential and wide-open space for scaling your first facilities."
+    },
+    "riverplain": {
+      "name": "Riverplain",
+      "description": "A broad trade plain tied together by water routes and settlement hubs that favor balanced growth."
+    }
+  },
+  "buildingTypes": {
+    "ironridge_iron_extractor": {
+      "name": "Ironridge Ore Extractor",
+      "description": "A rugged starter extractor tuned for Ironridge ore seams and early industrial throughput."
+    },
+    "greenhaven_timber_extractor": {
+      "name": "Greenhaven Timber Extractor",
+      "description": "A compact forestry extractor built for Greenhaven's steady timber output."
+    },
+    "sunbarrel_oil_extractor": {
+      "name": "Sunbarrel Oil Extractor",
+      "description": "A starter derrick platform for Sunbarrel crude fields with higher upkeep but strong output."
+    },
+    "riverplain_water_extractor": {
+      "name": "Riverplain Water Extractor",
+      "description": "A low-maintenance intake platform designed for Riverplain's connected water routes."
+    }
+  },
+  "resources": {
+    "iron_ore": {
+      "name": "Iron ore"
+    },
+    "iron_ingot": {
+      "name": "Iron ingot"
+    },
+    "coal": {
+      "name": "Coal"
+    },
+    "wood": {
+      "name": "Wood"
+    },
+    "crude_oil": {
+      "name": "Crude oil"
+    },
+    "sand": {
+      "name": "Sand"
+    },
+    "water": {
+      "name": "Water"
+    },
+    "crops": {
+      "name": "Crops"
+    }
+  },
+  "ledger": {
+    "actions": {
+      "starter_grant": {
+        "title": "Starter package granted",
+        "description": "Your corporation received its initial funding package."
+      },
+      "build": {
+        "title": "Extractor placed",
+        "description": "Your first extractor was placed and is now part of your network."
+      },
+      "upgrade": {
+        "title": "Building upgraded",
+        "description": "A building upgrade was recorded in your ledger."
+      },
+      "claim_production": {
+        "title": "Production claimed",
+        "description": "{{amount}} {{resource}} moved into inventory."
+      },
+      "production_transform_started": {
+        "title": "Transform started",
+        "description": "A production batch for {{resource}} was started."
+      },
+      "production_completed": {
+        "title": "Production completed",
+        "description": "{{amount}} {{resource}} moved into inventory."
+      },
+      "market_purchase": {
+        "title": "Resource purchased",
+        "description": "{{resource}} purchased from the market."
+      },
+      "market_sell": {
+        "title": "Resource sold",
+        "description": "{{resource}} sold on the market for a credit return."
+      },
+      "market_fee": {
+        "title": "Market fee charged",
+        "description": "A market fee was applied to your recent {{resource}} sale."
+      },
+      "maintenance": {
+        "title": "Maintenance paid",
+        "description": "A maintenance expense was recorded for your operation."
+      }
+    }
+  },
+  "tutorial": {
+    "title": "Tutorial",
+    "progress": "Step {{current}} / {{total}}",
+    "objectiveLabel": "Objective:",
+    "openAction": "Open step",
+    "skip": "Skip tutorial",
+    "skipping": "Skipping...",
+    "steps": {
+      "welcome": {
+        "title": "Welcome",
+        "description": "Welcome to Industrial Dominion. Resources gain value when they are extracted, transformed, and traded. Your first goal is to build a small profitable operation.",
+        "objective": "Receive your starting capital."
+      },
+      "place_extractor": {
+        "title": "Place your first extractor",
+        "description": "Your starting capital is ready. Place the first extractor tied to your chosen region so your operation can begin producing resources.",
+        "objective": "Place your first resource extractor."
+      },
+      "claim_production": {
+        "title": "Claim your first production",
+        "description": "Your extractor generates output over time. Claim the completed production and move those resources into inventory.",
+        "objective": "Collect the first produced resources from your extractor."
+      },
+      "view_inventory": {
+        "title": "Check your inventory",
+        "description": "Inventory is where extracted resources become available for sale. Review your stock before you move to the market.",
+        "objective": "Open the inventory section and confirm your extracted resources."
+      },
+      "sell_resource": {
+        "title": "Sell your first resource",
+        "description": "Selling converts production into credits. Use the market to turn your first stockpile into immediate revenue.",
+        "objective": "Sell your first produced resource on the market."
+      },
+      "complete": {
+        "title": "Starter loop complete",
+        "description": "You have completed your first economic loop. You extracted resources, collected production, and sold goods on the market. Industrial Dominion rewards players who understand production, logistics, and trade.",
+        "objective": "Starter tutorial complete."
+      }
+    }
+  },
+  "transforms": {
+    "ironridge_iron_ingot_batch": {
+      "name": "Iron ingot batch",
+      "description": "Refine a starter batch of iron ore into a smaller volume of industrial iron ingots."
+    }
+  },
+  "gameplayErrors": {
+    "missingApiBaseUrl": "The game client is missing its API connection settings.",
+    "bootstrapRequired": "Finish onboarding before using this gameplay action.",
+    "firstExtractorAlreadyPlaced": "Your first extractor has already been placed.",
+    "extractorRegionMismatch": "This extractor does not match your selected region.",
+    "unknownStarterExtractor": "This starter extractor could not be identified.",
+    "extractorNotFound": "The selected extractor could not be found for your corporation.",
+    "productionNotReady": "No production is ready to claim yet.",
+    "invalidStarterExtractor": "This building cannot use the starter production claim flow.",
+    "invalidBootstrapPayload": "The onboarding request was invalid. Try selecting your region again.",
+    "invalidMarketBuyPayload": "The buy order was invalid. Adjust the quantity and try again.",
+    "invalidMarketSellPayload": "The sell order was invalid. Adjust the quantity and try again.",
+    "invalidTransformStartPayload": "The transform request was invalid. Try selecting the recipe again.",
+    "invalidTransformClaimPayload": "The transform claim request was invalid. Try again.",
+    "notEnoughCredits": "You do not have enough credits to complete that purchase.",
+    "notEnoughInventory": "You do not have enough inventory to complete that sale.",
+    "notEnoughTransformInput": "You do not have enough input inventory to start that transform.",
+    "resourceNotFound": "That resource could not be found.",
+    "resourceNotPurchasable": "That resource cannot be purchased on the market.",
+    "resourceNotTradable": "That resource cannot be sold on the market.",
+    "transformRecipeNotFound": "That transform recipe could not be found.",
+    "transformBuildingNotFound": "The selected building could not run that transform.",
+    "transformRecipeNotAllowed": "That recipe does not match your current starter building.",
+    "transformAlreadyActive": "A transform batch is already active for this building.",
+    "transformJobNotFound": "That transform batch could not be found.",
+    "transformNotReady": "That transform batch is not ready to claim yet.",
+    "transformAlreadyClaimed": "That transform batch has already been claimed.",
+    "invalidSellQuantity": "Choose a sell quantity greater than zero.",
+    "generic": "Something went wrong in the starter gameplay flow. Please try again."
+  },
+  "news": {
+    "system": {
+      "startup": {
+        "headline": "Industrial Dominion network initialized",
+        "body": "Regional command channels are now online. Founding operators can begin extraction, trading, and expansion from their first foothold."
+      },
+      "market": {
+        "headline": "Starter commodity desks are now open",
+        "body": "The system market is accepting early raw-material sales at baseline prices, with standard exchange fees applied to each filled order."
+      }
+    }
+  }
+}

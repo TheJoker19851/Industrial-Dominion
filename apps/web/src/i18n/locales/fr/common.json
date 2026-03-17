@@ -1,0 +1,319 @@
+{
+  "common": {
+    "appName": "Industrial Dominion",
+    "shellBadge": "Reseau de commandement economique"
+  },
+  "shell": {
+    "kicker": "Base du projet",
+    "headline": "Pilotez votre essor industriel depuis une interface responsive unique.",
+    "subheadline": "Cette premiere coque frontend met en place le routage, le style partage et les ecrans principaux qui seront approfondis ensuite."
+  },
+  "navigation": {
+    "dashboard": "Tableau de bord",
+    "market": "Marché",
+    "onboarding": "Départ",
+    "settings": "Réglages"
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "credits": "Crédits",
+    "production": "Sortie par heure",
+    "inventoryTotal": "Total en stock",
+    "authLoading": "Verification de votre session...",
+    "loading": "Chargement de votre tableau de bord...",
+    "signInRequired": "Connectez-vous depuis les reglages pour voir votre tableau de bord.",
+    "bootstrapRequired": "Terminez l'onboarding pour debloquer votre premier extracteur et votre inventaire.",
+    "openOnboarding": "Ouvrir l'onboarding",
+    "extractorTitle": "Premier extracteur",
+    "extractorOutput": "{{amount}} {{resource}} par heure",
+    "claimReady": "{{amount}} {{resource}} prêts a etre reclames",
+    "nextClaimAt": "Prochaine fenetre de collecte : {{date}}",
+    "claimAction": "Reclamer la production",
+    "claiming": "Collecte...",
+    "placeExtractorAction": "Placer {{extractor}}",
+    "placingExtractor": "Placement de l'extracteur...",
+    "inventoryTitle": "Inventaire",
+    "emptyInventory": "Vos entrepots sont vides. Reclamez la production de votre extracteur pour stocker vos premieres ressources.",
+    "transformTitle": "Transformation de base",
+    "emptyTransforms": "Aucune recette de transformation n'est encore disponible pour votre structure de depart.",
+    "transformRecipeLine": "{{inputAmount}} {{inputResource}} -> {{outputAmount}} {{outputResource}}",
+    "transformReadyToStart": "Les intrants sont disponibles. Lancez le lot de transformation quand vous le souhaitez.",
+    "transformMissingInput": "Il manque encore {{amount}} {{resource}} pour lancer cette transformation.",
+    "transformCompletesAt": "Transformation terminee a : {{date}}",
+    "transformReadyToClaim": "{{outputAmount}} {{outputResource}} pret(s) a recuperer.",
+    "startTransformAction": "Lancer la transformation",
+    "startingTransform": "Lancement...",
+    "claimTransformAction": "Recuperer la sortie",
+    "claimingTransform": "Recuperation...",
+    "noExtractor": "Placez votre premier extracteur depuis l'onboarding pour commencer la production.",
+    "noExtractorShort": "Aucun extracteur",
+    "ledgerTitle": "Activite recente",
+    "emptyLedger": "Aucune activite de ledger pour le moment. Reclamez la production ou vendez des ressources pour demarrer ce flux.",
+    "newsTitle": "Nouvelles systeme",
+    "emptyNews": "Aucune nouvelle systeme pour le moment.",
+    "error": "Erreur du tableau de bord : {{message}}"
+  },
+  "onboarding": {
+    "title": "Choisissez votre région",
+    "subtitle": "Choisissez le territoire qui servira de base a votre premier essor industriel. Cette etape reste legere pour le moment, mais l'aperçu doit deja etre clair sur mobile.",
+    "regionCardLabel": "Region de depart",
+    "selectedBadge": "Selectionnee",
+    "selectBadge": "Choisir",
+    "selectionKicker": "Apercu du choix",
+    "selectionPreviewTitle": "Ce que cela debloquera ensuite",
+    "selectionPreviewBody": "La region choisie alimentera ensuite le flux de creation du joueur, le package de depart et la pose du premier extracteur.",
+    "confirmRegion": "Verrouiller la region en apercu",
+    "confirmingRegion": "Verrouillage de la region...",
+    "selectionHint": "Ce choix est maintenant enregistre par le flux backend de bootstrap et restera lie a votre profil connecte.",
+    "authLoading": "Verification de votre session...",
+    "signInRequired": "Connectez-vous depuis les reglages avant de terminer l'onboarding.",
+    "statusLoading": "Chargement de votre statut de bootstrap...",
+    "completedKicker": "Bootstrap termine",
+    "completedBody": "Votre region est verrouillee et votre package de depart a ete attribue. Les prochaines taches d'onboarding pourront maintenant placer votre premier extracteur.",
+    "openDashboard": "Ouvrir le tableau de bord",
+    "alreadyBootstrapped": "Ce compte a deja termine le bootstrap.",
+    "bootstrapError": "Erreur de bootstrap : {{message}}"
+  },
+  "market": {
+    "title": "Marché",
+    "authLoading": "Verification de votre session...",
+    "loading": "Chargement de votre marché...",
+    "signInRequired": "Connectez-vous depuis les reglages pour vendre votre inventaire.",
+    "bootstrapRequired": "Terminez l'onboarding avant d'ouvrir le marché.",
+    "openOnboarding": "Ouvrir l'onboarding",
+    "credits": "Crédits",
+    "fee": "Frais du marché",
+    "buyTitle": "Acheter des ressources",
+    "buySubtitle": "Utilisez le marche systeme pour acheter des matieres premieres aux prix de base.",
+    "buyOfferLine": "Offre du marche systeme",
+    "buyQuantity": "Quantite a acheter",
+    "buyTotal": "Cout total : {{value}}",
+    "buyBalanceAfter": "Solde apres achat : {{value}}",
+    "buyAction": "Acheter {{quantity}} {{resource}}",
+    "buying": "Achat...",
+    "buySuccess": "{{quantity}} {{resource}} achetes pour {{cost}}.",
+    "sellTitle": "Vendre le stock",
+    "sellSubtitle": "Revendez votre stock actuel au marche systeme.",
+    "inventoryLine": "{{quantity}} unites disponibles",
+    "unitPrice": "Prix unitaire : {{price}}",
+    "netValue": "Net si tout est vendu : {{value}}",
+    "sellQuantity": "Quantite a vendre",
+    "grossPreview": "Brut : {{value}}",
+    "feePreview": "Frais : {{value}}",
+    "netPreview": "Net : {{value}}",
+    "sellAction": "Vendre {{quantity}} {{resource}}",
+    "selling": "Vente...",
+    "sellSuccess": "{{quantity}} {{resource}} vendus pour {{credits}} apres frais.",
+    "emptyInventory": "Vous n'avez pas encore d'inventaire pret a vendre. Reclamez d'abord votre production depuis le tableau de bord.",
+    "error": "Erreur du marché : {{message}}"
+  },
+  "settings": {
+    "title": "Réglages",
+    "toggleLanguage": "Changer la langue",
+    "currentLanguage": "Langue actuelle : {{locale}}",
+    "authTitle": "Authentification",
+    "authLoading": "Verification de votre session...",
+    "signedInAs": "Connecte en tant que {{email}}",
+    "signOut": "Se deconnecter",
+    "emailLabel": "Adresse e-mail",
+    "emailPlaceholder": "operateur@industrialdominion.com",
+    "sendMagicLink": "Envoyer un lien magique",
+    "linkSent": "Lien magique envoye. Verifiez votre boite de reception.",
+    "signedOut": "Vous avez ete deconnecte.",
+    "authError": "Erreur d'authentification : {{message}}"
+  },
+  "regions": {
+    "ironridge": {
+      "name": "Ironridge",
+      "description": "Une frontiere de cretes, de fonderies et de corridors de fret pensee pour une expansion industrielle rapide."
+    },
+    "greenhaven": {
+      "name": "Greenhaven",
+      "description": "Un bassin logistique fertile ou terres agricoles, routes forestieres et acces fluvial soutiennent un depart stable."
+    },
+    "sunbarrel": {
+      "name": "Sunbarrel",
+      "description": "Une ceinture d'extraction seche avec un fort potentiel energetique et de l'espace pour etendre vos premieres installations."
+    },
+    "riverplain": {
+      "name": "Riverplain",
+      "description": "Une vaste plaine commerciale reliee par des voies d'eau et des centres urbains favorables a une croissance equilibree."
+    }
+  },
+  "buildingTypes": {
+    "ironridge_iron_extractor": {
+      "name": "Extracteur de minerai d'Ironridge",
+      "description": "Un extracteur de depart robuste concu pour les filons de fer d'Ironridge et un premier rendement industriel."
+    },
+    "greenhaven_timber_extractor": {
+      "name": "Extracteur de bois de Greenhaven",
+      "description": "Un extracteur forestier compact adapte a la production reguliere de bois de Greenhaven."
+    },
+    "sunbarrel_oil_extractor": {
+      "name": "Extracteur petrolier de Sunbarrel",
+      "description": "Une plateforme de derrick de depart pour les champs de brut de Sunbarrel, avec un entretien plus eleve mais une bonne sortie."
+    },
+    "riverplain_water_extractor": {
+      "name": "Extracteur d'eau de Riverplain",
+      "description": "Une plateforme d'adduction a faible entretien pensee pour les voies d'eau connectees de Riverplain."
+    }
+  },
+  "resources": {
+    "iron_ore": {
+      "name": "Minerai de fer"
+    },
+    "iron_ingot": {
+      "name": "Lingot de fer"
+    },
+    "coal": {
+      "name": "Charbon"
+    },
+    "wood": {
+      "name": "Bois"
+    },
+    "crude_oil": {
+      "name": "Petrole brut"
+    },
+    "sand": {
+      "name": "Sable"
+    },
+    "water": {
+      "name": "Eau"
+    },
+    "crops": {
+      "name": "Cultures"
+    }
+  },
+  "ledger": {
+    "actions": {
+      "starter_grant": {
+        "title": "Package de depart attribue",
+        "description": "Votre entreprise a recu son financement initial."
+      },
+      "build": {
+        "title": "Extracteur place",
+        "description": "Votre premier extracteur a ete place et fait maintenant partie de votre reseau."
+      },
+      "upgrade": {
+        "title": "Batiment ameliore",
+        "description": "Une amelioration de batiment a ete enregistree dans votre ledger."
+      },
+      "claim_production": {
+        "title": "Production reclamee",
+        "description": "{{amount}} {{resource}} ont ete ajoutes a l'inventaire."
+      },
+      "production_transform_started": {
+        "title": "Transformation lancee",
+        "description": "Un lot de production pour {{resource}} a ete lance."
+      },
+      "production_completed": {
+        "title": "Production terminee",
+        "description": "{{amount}} {{resource}} ont ete ajoutes a l'inventaire."
+      },
+      "market_purchase": {
+        "title": "Ressource achetee",
+        "description": "{{resource}} a ete achetee sur le marche."
+      },
+      "market_sell": {
+        "title": "Ressource vendue",
+        "description": "{{resource}} a ete vendu sur le marché contre des credits."
+      },
+      "market_fee": {
+        "title": "Frais de marché preleves",
+        "description": "Des frais de marché ont ete appliques a votre recente vente de {{resource}}."
+      },
+      "maintenance": {
+        "title": "Maintenance payee",
+        "description": "Une depense de maintenance a ete enregistree pour votre operation."
+      }
+    }
+  },
+  "tutorial": {
+    "title": "Tutoriel",
+    "progress": "Etape {{current}} / {{total}}",
+    "objectiveLabel": "Objectif :",
+    "openAction": "Ouvrir l'etape",
+    "skip": "Ignorer le tutoriel",
+    "skipping": "Ignoré...",
+    "steps": {
+      "welcome": {
+        "title": "Bienvenue",
+        "description": "Bienvenue dans Industrial Dominion. Les ressources gagnent de la valeur lorsqu'elles sont extraites, transformees et echangees. Votre premier objectif est de construire une petite operation rentable.",
+        "objective": "Recevez votre capital de depart."
+      },
+      "place_extractor": {
+        "title": "Placez votre premier extracteur",
+        "description": "Votre capital de depart est pret. Placez le premier extracteur lie a votre region choisie pour commencer la production.",
+        "objective": "Placez votre premier extracteur de ressources."
+      },
+      "claim_production": {
+        "title": "Reclamez votre premiere production",
+        "description": "Votre extracteur produit au fil du temps. Reclamez la production terminee et deplacez ces ressources dans votre inventaire.",
+        "objective": "Collectez les premieres ressources produites par votre extracteur."
+      },
+      "view_inventory": {
+        "title": "Consultez votre inventaire",
+        "description": "L'inventaire est l'endroit ou vos ressources extraites deviennent disponibles pour la vente. Verifiez votre stock avant d'aller au marche.",
+        "objective": "Ouvrez l'inventaire et confirmez vos ressources extraites."
+      },
+      "sell_resource": {
+        "title": "Vendez votre premiere ressource",
+        "description": "La vente convertit votre production en credits. Utilisez le marche pour transformer votre premier stock en revenu immediat.",
+        "objective": "Vendez votre premiere ressource produite sur le marche."
+      },
+      "complete": {
+        "title": "Boucle de depart terminee",
+        "description": "Vous avez termine votre premiere boucle economique. Vous avez extrait des ressources, collecte la production et vendu des marchandises sur le marche. Industrial Dominion recompense les joueurs qui comprennent la production, la logistique et le commerce.",
+        "objective": "Tutoriel de depart termine."
+      }
+    }
+  },
+  "transforms": {
+    "ironridge_iron_ingot_batch": {
+      "name": "Lot de lingots de fer",
+      "description": "Raffinez un premier lot de minerai de fer pour obtenir un plus petit volume de lingots industriels."
+    }
+  },
+  "gameplayErrors": {
+    "missingApiBaseUrl": "Le client du jeu ne dispose pas de ses parametres de connexion API.",
+    "bootstrapRequired": "Terminez l'onboarding avant d'utiliser cette action de jeu.",
+    "firstExtractorAlreadyPlaced": "Votre premier extracteur a deja ete place.",
+    "extractorRegionMismatch": "Cet extracteur ne correspond pas a votre region selectionnee.",
+    "unknownStarterExtractor": "Cet extracteur de depart n'a pas pu etre identifie.",
+    "extractorNotFound": "L'extracteur selectionne est introuvable pour votre entreprise.",
+    "productionNotReady": "Aucune production n'est encore prete a etre reclamee.",
+    "invalidStarterExtractor": "Ce batiment ne peut pas utiliser le flux de collecte de depart.",
+    "invalidBootstrapPayload": "La requete d'onboarding est invalide. Reessayez apres avoir choisi votre region.",
+    "invalidMarketBuyPayload": "L'ordre d'achat est invalide. Ajustez la quantite puis reessayez.",
+    "invalidMarketSellPayload": "L'ordre de vente est invalide. Ajustez la quantite puis reessayez.",
+    "invalidTransformStartPayload": "La demande de transformation est invalide. Reessayez en choisissant la recette.",
+    "invalidTransformClaimPayload": "La recuperation de transformation est invalide. Reessayez.",
+    "notEnoughCredits": "Vous ne disposez pas d'assez de credits pour cet achat.",
+    "notEnoughInventory": "Vous ne disposez pas d'un stock suffisant pour cette vente.",
+    "notEnoughTransformInput": "Vous n'avez pas assez d'intrants pour lancer cette transformation.",
+    "resourceNotFound": "Cette ressource est introuvable.",
+    "resourceNotPurchasable": "Cette ressource ne peut pas etre achetee sur le marche.",
+    "resourceNotTradable": "Cette ressource ne peut pas etre vendue sur le marche.",
+    "transformRecipeNotFound": "Cette recette de transformation est introuvable.",
+    "transformBuildingNotFound": "Le batiment selectionne ne peut pas executer cette transformation.",
+    "transformRecipeNotAllowed": "Cette recette ne correspond pas a votre batiment de depart actuel.",
+    "transformAlreadyActive": "Un lot de transformation est deja actif pour ce batiment.",
+    "transformJobNotFound": "Ce lot de transformation est introuvable.",
+    "transformNotReady": "Ce lot de transformation n'est pas encore pret a etre recupere.",
+    "transformAlreadyClaimed": "Ce lot de transformation a deja ete recupere.",
+    "invalidSellQuantity": "Choisissez une quantite de vente superieure a zero.",
+    "generic": "Une erreur est survenue dans la boucle de jeu initiale. Veuillez reessayer."
+  },
+  "news": {
+    "system": {
+      "startup": {
+        "headline": "Reseau Industrial Dominion initialise",
+        "body": "Les canaux de commandement regionaux sont maintenant en ligne. Les operateurs fondateurs peuvent commencer l'extraction, le commerce et l'expansion depuis leur premier point d'ancrage."
+      },
+      "market": {
+        "headline": "Les bureaux de matieres premieres de depart sont ouverts",
+        "body": "Le marché systeme accepte maintenant les ventes initiales de ressources brutes aux prix de base, avec les frais standards appliques a chaque ordre execute."
+      }
+    }
+  }
+}

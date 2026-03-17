@@ -1,0 +1,19 @@
+{
+  "name": "@industrial-dominion/ui",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "lint": "eslint src --max-warnings=0",
+    "test": "vitest run tests --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --check \"src/**/*.{ts,tsx}\" \"*.json\""
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "typescript": "^5.6.3"
+  }
+}

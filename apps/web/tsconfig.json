@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@industrial-dominion/shared": ["../../packages/shared/src/index.ts"],
+      "@industrial-dominion/ui": ["../../packages/ui/src/index.ts"],
+      "@industrial-dominion/config": ["../../packages/config/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}
