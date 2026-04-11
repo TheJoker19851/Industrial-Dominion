@@ -1,10 +1,15 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { starterExtractorCatalog, starterTransformRecipes } from '@industrial-dominion/shared';
+import {
+  starterExtractorCatalog,
+  starterProcessingInstallationCatalog,
+  starterTransformRecipes,
+} from '@industrial-dominion/shared';
 import {
   claimProduction,
   claimTransform,
   placeFirstExtractor,
+  placeFirstProcessingInstallation,
   startTransform,
 } from './buildings.service.js';
 import { syncStarterTutorialProgress } from '../tutorial/tutorial.service.js';
@@ -21,6 +26,15 @@ const placeFirstExtractorSchema = z.object({
 const startTransformSchema = z.object({
   recipeId: z.enum(
     starterTransformRecipes.map((recipe) => recipe.id) as [string, ...string[]],
+  ),
+});
+
+const placeFirstProcessingInstallationSchema = z.object({
+  buildingTypeId: z.enum(
+    starterProcessingInstallationCatalog.map((installation) => installation.id) as [
+      string,
+      ...string[],
+    ],
   ),
 });
 
@@ -71,6 +85,48 @@ export const buildingRoutes: FastifyPluginAsync = async (app) => {
   );
 
   app.post(
+    '/first-processing-installation',
+    {
+      preHandler: app.requireAuth,
+    },
+    async (request, reply) => {
+      const parsed = placeFirstProcessingInstallationSchema.safeParse(request.body);
+
+      if (!parsed.success) {
+        return reply.code(400).send({
+          error: 'Bad Request',
+          message: 'Invalid first processing installation payload.',
+        });
+      }
+
+      try {
+        return await placeFirstProcessingInstallation(app, {
+          playerId: request.authUser!.id,
+          buildingTypeId: parsed.data.buildingTypeId,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Unable to place first processing installation.';
+        const statusCode =
+          message === 'Player must complete bootstrap before placing a processing installation.' ||
+          message ===
+            'Player must place the first extractor before placing a processing installation.' ||
+          message === 'Player already placed the first processing installation.' ||
+          message === 'Unknown starter processing installation.'
+            ? 400
+            : 500;
+
+        return reply.code(statusCode).send({
+          error: statusCode === 400 ? 'Bad Request' : 'Internal Server Error',
+          message,
+        });
+      }
+    },
+  );
+
+  app.post(
     '/:buildingId/start-transform',
     {
       preHandler: app.requireAuth,
@@ -104,6 +160,7 @@ export const buildingRoutes: FastifyPluginAsync = async (app) => {
             ? 404
             : message === 'Transform recipe not found.' ||
                 message === 'Building cannot run this transform recipe.' ||
+                message === 'Starter processing installation required for production.' ||
                 message === 'A transform job is already active for this building.' ||
                 message === 'Not enough input inventory to start transform.'
               ? 400

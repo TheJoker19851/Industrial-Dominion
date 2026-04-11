@@ -44,6 +44,19 @@ function createAppMock(initialPlayer: {
   const playerSettingsTable = {
     upsert: vi.fn().mockResolvedValue({ error: null }),
   };
+  const playerLocationsTable = {
+    select: vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        order: vi.fn().mockReturnValue({
+          returns: vi.fn().mockResolvedValue({
+            data: [],
+            error: null,
+          }),
+        }),
+      }),
+    }),
+    upsert: vi.fn().mockResolvedValue({ error: null }),
+  };
   const rpc = vi.fn().mockImplementation(async (_fn, payload) => {
     const insertedPlayer = (await playersTable.eq('id', payload.p_player_id).maybeSingle())
       .data;
@@ -75,6 +88,10 @@ function createAppMock(initialPlayer: {
             return playerSettingsTable;
           }
 
+          if (table === 'player_locations') {
+            return playerLocationsTable;
+          }
+
           throw new Error(`Unexpected table ${table}`);
         },
         rpc,
@@ -82,6 +99,7 @@ function createAppMock(initialPlayer: {
     } as unknown as FastifyInstance,
     rpc,
     playersTable,
+    playerLocationsTable,
     playerSettingsTable,
   };
 }
@@ -97,7 +115,7 @@ describe('bootstrap service', () => {
   });
 
   it('creates player bootstrap state and grants starter package', async () => {
-    const { app, rpc, playersTable, playerSettingsTable } = createAppMock();
+    const { app, rpc, playersTable, playerLocationsTable, playerSettingsTable } = createAppMock();
 
     const result = await bootstrapPlayer(app, {
       playerId: 'player-123',
@@ -114,6 +132,7 @@ describe('bootstrap service', () => {
       player_id: 'player-123',
       locale: 'en',
     });
+    expect(playerLocationsTable.upsert).toHaveBeenCalled();
     expect(rpc).toHaveBeenCalledWith('grant_starter_package', {
       p_player_id: 'player-123',
       p_credits: 2500,

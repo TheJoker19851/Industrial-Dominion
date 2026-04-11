@@ -59,6 +59,30 @@ function mapPlayer(player: PlayerRow | null): BootstrapStatusResult['player'] {
   };
 }
 
+async function ensurePlayerLocations(app: FastifyInstance, playerId: string) {
+  const { error } = await app.getSupabaseAdminClient().from('player_locations').upsert(
+    [
+      {
+        player_id: playerId,
+        key: 'primary_storage',
+        name_key: 'locations.primary_storage.name',
+      },
+      {
+        player_id: playerId,
+        key: 'remote_storage',
+        name_key: 'locations.remote_storage.name',
+      },
+    ],
+    {
+      onConflict: 'player_id,key',
+    },
+  );
+
+  if (error) {
+    throw new Error(`Failed to ensure player locations: ${error.message}`);
+  }
+}
+
 async function ensurePlayerRecord(
   app: FastifyInstance,
   input: {
@@ -103,6 +127,8 @@ async function ensurePlayerRecord(
   if (error) {
     throw new Error(`Failed to persist player settings: ${error.message}`);
   }
+
+  await ensurePlayerLocations(app, input.playerId);
 }
 
 export async function getBootstrapStatus(

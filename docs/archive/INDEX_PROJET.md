@@ -1,5 +1,7 @@
 # INDEX_PROJET.md
 
+> Archived. Use /docs/AI_ENTRYPOINT.md for the current doc hierarchy and read order.
+
 ## Read order
 
 1. AGENTS.md

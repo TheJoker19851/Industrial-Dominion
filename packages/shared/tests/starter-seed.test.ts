@@ -59,7 +59,9 @@ describe('starter seed SQL', () => {
     expect(buildingTypeValues).toContain("'greenhaven_timber_extractor'");
     expect(buildingTypeValues).toContain("'sunbarrel_oil_extractor'");
     expect(buildingTypeValues).toContain("'riverplain_water_extractor'");
+    expect(buildingTypeValues).toContain("'starter_processing_installation'");
     expect(buildingTypeValues.match(/'extraction'/g)).toHaveLength(4);
+    expect(buildingTypeValues.match(/'processing'/g)).toHaveLength(1);
   });
 
   it('seeds the starter transform recipe', () => {

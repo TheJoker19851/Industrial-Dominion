@@ -1,0 +1,8 @@
+
+> @industrial-dominion/api@ dev D:\Industrial Dominion\apps\api
+> tsx watch src/server.ts
+
+{"level":30,"time":1774602084246,"pid":49308,"hostname":"DESKTOP-142BRA6","msg":"Server listening at http://127.0.0.1:3000"}
+{"level":30,"time":1774602084247,"pid":49308,"hostname":"DESKTOP-142BRA6","msg":"Server listening at http://192.168.2.10:3000"}
+{"level":30,"time":1774602091042,"pid":49308,"hostname":"DESKTOP-142BRA6","reqId":"req-1","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":55831},"msg":"incoming request"}
+{"level":30,"time":1774602091047,"pid":49308,"hostname":"DESKTOP-142BRA6","reqId":"req-1","res":{"statusCode":200},"responseTime":4.857300043106079,"msg":"request completed"}

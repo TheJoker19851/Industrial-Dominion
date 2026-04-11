@@ -220,3 +220,34 @@ Implementation journal for Codex and future contributors.
 - Added a conservative transform-production MVP around a single real recipe, `iron_ore -> iron_ingot`, using the existing building and `production_jobs` model instead of introducing a parallel production system.
 - Backed transform start and claim with atomic SQL functions so input inventory consumption, job persistence, output inventory grant, and transform ledger entries stay backend-authoritative and duplication-safe.
 - Surfaced the transform flow in the dashboard with mobile-readable start and claim actions, added shared/API/web coverage, and re-ran `corepack pnpm lint`, `corepack pnpm typecheck`, `corepack pnpm build`, `corepack pnpm test`, and `corepack pnpm check:i18n`.
+
+### 2026-03-17 - TASK-035 refinement
+
+- Realigned the first processing flow to a more conservative MVP endpoint, `POST /production/jobs`, where the client sends only `recipeKey` and `runs` while all recipe math and inventory updates remain server-side.
+- Added a single instant-complete production recipe, `iron_ingot_from_iron_ore`, backed by an atomic SQL function that validates input inventory, deducts iron ore, adds iron ingots, records a `production_jobs` row, and writes the completion ledger entry in one transaction.
+- Replaced the dashboard transform controls with a smaller production panel for this route, added targeted API/shared tests for success, insufficient inventory, and invalid payloads, and re-ran `corepack pnpm lint`, `corepack pnpm typecheck`, `corepack pnpm build`, `corepack pnpm test`, and `corepack pnpm check:i18n`.
+
+### 2026-03-17 - TASK-036
+
+- Added a conservative logistics MVP with player-scoped storage locations, location-aware inventory persistence, an atomic `create_logistics_transfer` SQL function, and a dedicated `logistics_transfers` record table.
+- Kept the existing starter loop stable by routing current production and market flows through `primary_storage`, then surfaced a minimal dashboard transfer panel plus transfer ledger visibility for the new flow.
+- Added backend route/service coverage, updated dashboard and market state handling, and re-ran `corepack pnpm lint`, `corepack pnpm typecheck`, `corepack pnpm build`, `corepack pnpm test`, and `corepack pnpm check:i18n`; I also made a small Turbo dependency fix so root `pnpm typecheck` now builds upstream shared package outputs before downstream type checks.
+
+### 2026-03-17 - TASK-033
+
+- Expanded the existing thin tutorial layer into a full backend-authoritative economic tutorial that progresses through extract, claim, inventory, sell, buy, produce, and logistics using only real gameplay actions.
+- Kept the implementation conservative by evolving the existing `player_tutorial_progress` flow instead of creating a parallel quest system, then added migration `0010_tutorial_progress.sql` to add an explicit `current_step` and map legacy tutorial progress safely.
+- Wired tutorial progression into market buy, production, and logistics routes, updated the shared tutorial step catalog and dashboard panel copy, and re-ran `corepack pnpm lint`, `corepack pnpm typecheck`, `corepack pnpm build`, `corepack pnpm test`, and `corepack pnpm check:i18n`.
+
+### 2026-03-17 - TASK-037
+
+- Added a conservative market depth MVP with player-created buy and sell limit orders, simple full-quantity matching, and atomic reservation or settlement logic in `create_market_limit_order`.
+- Extended the market snapshot and page with recent order visibility plus a minimal order form, while keeping instant market buy and sell flows intact.
+- Re-ran `corepack pnpm lint`, `corepack pnpm typecheck`, `corepack pnpm build`, `corepack pnpm test`, and `corepack pnpm check:i18n`; a narrow route-validation bug surfaced during test validation and was fixed by widening market-order resource parsing from starter raw resources to all shared `ResourceId` values.
+
+### 2026-04-03 - TASK-038
+
+- Added a conservative starter processing installation slice with shared content definitions, seed + migration coverage, and backend-authoritative placement via `POST /buildings/first-processing-installation`.
+- Reused the extractor placement pattern while keeping scope narrow: bootstrap validation, extractor prerequisite validation, one-time placement validation, build ledger write, and dashboard snapshot visibility for placed processing installation state.
+- Extended dashboard API/UI with a mobile-safe processing-installation CTA and installed-state card, added EN/FR i18n keys plus gameplay error mappings, and updated shared/api/web tests for the new snapshot and placement flow.
+- Re-ran `corepack pnpm lint`, `corepack pnpm typecheck`, `corepack pnpm build`, `corepack pnpm test`, and `corepack pnpm check:i18n`.

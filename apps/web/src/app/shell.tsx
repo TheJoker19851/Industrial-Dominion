@@ -1,7 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLanguageSwitcher } from '@/i18n/useLanguageSwitcher';
-import { TutorialPanel } from '@/features/tutorial/TutorialPanel';
 import { appNavigationItems } from './navigation';
 
 export function AppShell() {
@@ -52,24 +51,21 @@ export function AppShell() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:pb-6">
-        <section className="mb-6 rounded-3xl border border-line bg-panel/80 p-5 shadow-panel md:p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="space-y-2">
+        <section className="mb-5 rounded-3xl border border-line/80 bg-panel/70 p-4 shadow-panel md:p-5">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-1">
               <p className="text-xs uppercase tracking-[0.28em] text-accent">
                 {t('shell.kicker')}
               </p>
-              <h1 className="max-w-2xl text-2xl font-semibold text-slate-50 md:text-4xl">
-                {t('shell.headline')}
-              </h1>
-              <p className="max-w-2xl text-sm text-slate-300 md:text-base">
+              <p className="text-sm text-slate-300 md:text-base">
                 {t('shell.subheadline')}
               </p>
             </div>
+            <div className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              {t('shell.headline')}
+            </div>
           </div>
         </section>
-        <div className="mb-6">
-          <TutorialPanel />
-        </div>
         <Outlet />
       </main>
 

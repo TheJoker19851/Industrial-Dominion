@@ -1,5 +1,7 @@
 # STACK_OVERVIEW.md
 
+> Archived. This content is merged into /docs/ARCHITECTURE.md.
+
 Frontend
 
 - React

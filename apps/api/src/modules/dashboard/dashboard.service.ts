@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import {
   calculateStarterExtractorMetrics,
   starterExtractorCatalog,
+  starterProcessingInstallationCatalog,
   type DashboardSnapshot,
+  type DashboardLogisticsLocationSummary,
   type DashboardTransformRecipeSummary,
   type InventoryEntry,
   type LedgerActionType,
@@ -13,6 +15,7 @@ import {
   type ResourceId,
   type SupportedLocale,
 } from '@industrial-dominion/shared';
+import { readPlayerLocationId, readPlayerLocations } from '../../db/player-locations.js';
 import { getAvailableTransformState } from '../buildings/buildings.service.js';
 
 type PlayerRow = {
@@ -38,6 +41,7 @@ type ProductionJobRow = {
 
 type InventoryRow = {
   player_id: string;
+  location_id: string;
   resource_id: ResourceId;
   quantity: number;
 };
@@ -94,9 +98,17 @@ export async function getDashboardSnapshot(
     throw new Error(`Failed to load dashboard player state: ${playerError.message}`);
   }
 
+  const playerLocations = player
+    ? await readPlayerLocations(app, input.playerId)
+    : [];
+  const primaryLocationId = player
+    ? playerLocations.find((entry) => entry.key === 'primary_storage')?.id ??
+      (await readPlayerLocationId(app, input.playerId, 'primary_storage'))
+    : null;
+
   const { data: inventoryRows, error: inventoryError } = await supabase
     .from('inventories')
-    .select('player_id, resource_id, quantity')
+    .select('player_id, location_id, resource_id, quantity')
     .eq('player_id', input.playerId)
     .gt('quantity', 0)
     .order('quantity', { ascending: false })
@@ -106,13 +118,12 @@ export async function getDashboardSnapshot(
     throw new Error(`Failed to load dashboard inventory state: ${inventoryError.message}`);
   }
 
-  const { data: building, error: buildingError } = await supabase
+  const { data: buildings, error: buildingError } = await supabase
     .from('buildings')
     .select('id, building_type_id, level, created_at')
     .eq('player_id', input.playerId)
     .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle<BuildingRow>();
+    .returns<BuildingRow[]>();
 
   if (buildingError) {
     throw new Error(`Failed to load dashboard building state: ${buildingError.message}`);
@@ -143,22 +154,58 @@ export async function getDashboardSnapshot(
   }
 
   let extractor: DashboardSnapshot['extractor'] = null;
+  let processingInstallation: DashboardSnapshot['processingInstallation'] = null;
   let transformRecipes: DashboardTransformRecipeSummary[] = [];
+  const groupedInventory = new Map<string, InventoryRow[]>();
 
-  if (building) {
+  for (const row of inventoryRows ?? []) {
+    const bucket = groupedInventory.get(row.location_id) ?? [];
+    bucket.push(row);
+    groupedInventory.set(row.location_id, bucket);
+  }
+
+  const logisticsLocations = playerLocations.map<DashboardLogisticsLocationSummary>((location) => ({
+    locationId: location.id,
+    key: location.key,
+    nameKey: location.name_key,
+    inventory: (groupedInventory.get(location.id) ?? []).map((entry) => ({
+      resourceId: entry.resource_id,
+      quantity: entry.quantity,
+    })),
+  }));
+  const primaryInventoryRows = primaryLocationId
+    ? groupedInventory.get(primaryLocationId) ?? []
+    : [];
+
+  const extractorBuilding = (buildings ?? []).find((building) =>
+    starterExtractorCatalog.some((entry) => entry.id === building.building_type_id),
+  );
+  const processingBuilding = (buildings ?? []).find((building) =>
+    starterProcessingInstallationCatalog.some((entry) => entry.id === building.building_type_id),
+  );
+
+  if (processingBuilding) {
+    processingInstallation = {
+      buildingId: processingBuilding.id,
+      buildingTypeId: processingBuilding.building_type_id,
+      level: processingBuilding.level,
+    };
+  }
+
+  if (extractorBuilding) {
     const starterExtractor = starterExtractorCatalog.find(
-      (entry) => entry.id === building.building_type_id,
+      (entry) => entry.id === extractorBuilding.building_type_id,
     );
 
     if (starterExtractor) {
       const { data: latestJob, error: latestJobError } = await supabase
-        .from('production_jobs')
-        .select('id, completes_at, recipe_id, job_kind')
-        .eq('building_id', building.id)
-        .eq('job_kind', 'extraction')
-        .order('completes_at', { ascending: false })
-        .limit(1)
-        .maybeSingle<ProductionJobRow>();
+          .from('production_jobs')
+          .select('id, completes_at, recipe_id, job_kind')
+          .eq('building_id', extractorBuilding.id)
+          .eq('job_kind', 'extraction')
+          .order('completes_at', { ascending: false })
+          .limit(1)
+          .maybeSingle<ProductionJobRow>();
 
       if (latestJobError) {
         throw new Error(
@@ -166,11 +213,11 @@ export async function getDashboardSnapshot(
         );
       }
 
-      const claimAnchor = new Date(latestJob?.completes_at ?? building.created_at);
+      const claimAnchor = new Date(latestJob?.completes_at ?? extractorBuilding.created_at);
       const elapsedMs = now.getTime() - claimAnchor.getTime();
       const completedHours = Math.max(0, Math.floor(elapsedMs / HOUR_IN_MS));
       const metrics = calculateStarterExtractorMetrics(starterExtractor, {
-        level: building.level,
+        level: extractorBuilding.level,
       });
       const claimableQuantity = Math.floor(metrics.outputPerHour * completedHours);
       const nextClaimAt = new Date(
@@ -178,9 +225,9 @@ export async function getDashboardSnapshot(
       );
 
       extractor = {
-        buildingId: building.id,
-        buildingTypeId: building.building_type_id,
-        level: building.level,
+        buildingId: extractorBuilding.id,
+        buildingTypeId: extractorBuilding.building_type_id,
+        level: extractorBuilding.level,
         outputResourceId: starterExtractor.outputResourceId,
         outputPerHour: metrics.outputPerHour,
         claimableQuantity,
@@ -191,13 +238,13 @@ export async function getDashboardSnapshot(
       transformRecipes = (
         await getAvailableTransformState(app, {
           playerId: input.playerId,
-          buildingId: building.id,
-          buildingTypeId: building.building_type_id,
+          buildingId: extractorBuilding.id,
+          buildingTypeId: extractorBuilding.building_type_id,
           now,
         })
       ).map<DashboardTransformRecipeSummary>((entry) => ({
         recipeId: entry.recipe.id,
-        buildingId: building.id,
+        buildingId: extractorBuilding.id,
         nameKey: entry.recipe.nameKey,
         descriptionKey: entry.recipe.descriptionKey,
         inputResourceId: entry.recipe.inputResourceId,
@@ -205,7 +252,7 @@ export async function getDashboardSnapshot(
         outputResourceId: entry.recipe.outputResourceId,
         outputAmount: entry.recipe.outputAmount,
         durationSeconds: entry.recipe.durationSeconds,
-        canStart: entry.canStart,
+        canStart: Boolean(processingInstallation) && entry.canStart,
         missingInputAmount: entry.missingInputAmount,
         activeJob: entry.activeJob,
       }));
@@ -214,13 +261,15 @@ export async function getDashboardSnapshot(
 
   return {
     player: mapPlayer(player),
-    inventory: (inventoryRows ?? []).map<InventoryEntry>((entry) => ({
+    inventory: primaryInventoryRows.map<InventoryEntry>((entry) => ({
       playerId: entry.player_id,
       resourceId: entry.resource_id,
       quantity: entry.quantity,
     })),
     extractor,
+    processingInstallation,
     transformRecipes,
+    logisticsLocations,
     ledger: (ledgerRows ?? []).map<LedgerFeedEntry>((entry) => ({
       id: entry.id,
       actionType: entry.action_type,

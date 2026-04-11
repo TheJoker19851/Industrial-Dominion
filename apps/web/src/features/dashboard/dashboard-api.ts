@@ -21,6 +21,19 @@ export function placeFirstExtractor(input: {
   });
 }
 
+export function placeFirstProcessingInstallation(input: {
+  accessToken: string;
+  buildingTypeId: string;
+}) {
+  return apiRequest('/buildings/first-processing-installation', {
+    method: 'POST',
+    accessToken: input.accessToken,
+    body: JSON.stringify({
+      buildingTypeId: input.buildingTypeId,
+    }),
+  });
+}
+
 export function claimExtractorProduction(input: {
   accessToken: string;
   buildingId: string;
@@ -52,5 +65,39 @@ export function claimTransformJob(input: {
   return apiRequest('/buildings/transform-jobs/' + input.jobId + '/claim', {
     method: 'POST',
     accessToken: input.accessToken,
+  });
+}
+
+export function createProductionJob(input: {
+  accessToken: string;
+  recipeKey: string;
+  runs: number;
+}) {
+  return apiRequest('/production/jobs', {
+    method: 'POST',
+    accessToken: input.accessToken,
+    body: JSON.stringify({
+      recipeKey: input.recipeKey,
+      runs: input.runs,
+    }),
+  });
+}
+
+export function createLogisticsTransfer(input: {
+  accessToken: string;
+  fromLocationId: string;
+  toLocationId: string;
+  itemKey: string;
+  quantity: number;
+}) {
+  return apiRequest('/logistics/transfers', {
+    method: 'POST',
+    accessToken: input.accessToken,
+    body: JSON.stringify({
+      fromLocationId: input.fromLocationId,
+      toLocationId: input.toLocationId,
+      itemKey: input.itemKey,
+      quantity: input.quantity,
+    }),
   });
 }

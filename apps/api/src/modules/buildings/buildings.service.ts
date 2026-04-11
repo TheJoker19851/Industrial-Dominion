@@ -2,14 +2,17 @@ import type { FastifyInstance } from 'fastify';
 import {
   calculateStarterExtractorMetrics,
   starterExtractorCatalog,
+  starterProcessingInstallationCatalog,
   starterTransformRecipes,
   type ProductionTransformRecipeDefinition,
   type RegionId,
   type ResourceId,
   type StarterExtractorDefinition,
+  type StarterProcessingInstallationDefinition,
   type TransformClaimResult,
   type TransformStartResult,
 } from '@industrial-dominion/shared';
+import { readPlayerLocationId } from '../../db/player-locations.js';
 
 type PlayerPlacementState = {
   id: string;
@@ -25,6 +28,17 @@ export type FirstExtractorPlacementResult = {
     level: number;
   };
   extractor: StarterExtractorDefinition;
+};
+
+export type FirstProcessingInstallationPlacementResult = {
+  building: {
+    id: string;
+    playerId: string;
+    regionId: RegionId;
+    buildingTypeId: string;
+    level: number;
+  };
+  processingInstallation: StarterProcessingInstallationDefinition;
 };
 
 export type ClaimProductionResult = {
@@ -85,12 +99,23 @@ async function readPlayerPlacementState(app: FastifyInstance, playerId: string) 
   return data;
 }
 
-async function countPlayerBuildings(app: FastifyInstance, playerId: string) {
+async function countPlayerBuildingsByType(
+  app: FastifyInstance,
+  input: {
+    playerId: string;
+    buildingTypeIds: readonly string[];
+  },
+) {
+  if (input.buildingTypeIds.length === 0) {
+    return 0;
+  }
+
   const { count, error } = await app
     .getSupabaseAdminClient()
     .from('buildings')
     .select('*', { count: 'exact', head: true })
-    .eq('player_id', playerId);
+    .eq('player_id', input.playerId)
+    .in('building_type_id', [...input.buildingTypeIds]);
 
   if (error) {
     throw new Error(`Failed to count player buildings: ${error.message}`);
@@ -171,11 +196,13 @@ async function readInventoryQuantity(
     resourceId: ResourceId;
   },
 ) {
+  const locationId = await readPlayerLocationId(app, input.playerId, 'primary_storage');
   const { data, error } = await app
     .getSupabaseAdminClient()
     .from('inventories')
     .select('quantity')
     .eq('player_id', input.playerId)
+    .eq('location_id', locationId)
     .eq('resource_id', input.resourceId)
     .maybeSingle<InventoryState>();
 
@@ -203,6 +230,20 @@ function resolveStarterExtractor(
   }
 
   return extractor;
+}
+
+function resolveStarterProcessingInstallation(
+  buildingTypeId: string,
+): StarterProcessingInstallationDefinition {
+  const installation = starterProcessingInstallationCatalog.find(
+    (entry) => entry.id === buildingTypeId,
+  );
+
+  if (!installation) {
+    throw new Error('Unknown starter processing installation.');
+  }
+
+  return installation;
 }
 
 function resolvePlacedStarterExtractor(buildingTypeId: string): StarterExtractorDefinition {
@@ -247,7 +288,10 @@ export async function placeFirstExtractor(
     throw new Error('Player must complete bootstrap before placing an extractor.');
   }
 
-  const existingBuildings = await countPlayerBuildings(app, input.playerId);
+  const existingBuildings = await countPlayerBuildingsByType(app, {
+    playerId: input.playerId,
+    buildingTypeIds: starterExtractorCatalog.map((entry) => entry.id),
+  });
 
   if (existingBuildings > 0) {
     throw new Error('Player already placed the first extractor.');
@@ -301,6 +345,90 @@ export async function placeFirstExtractor(
       level: building.level,
     },
     extractor,
+  };
+}
+
+export async function placeFirstProcessingInstallation(
+  app: FastifyInstance,
+  input: {
+    playerId: string;
+    buildingTypeId: string;
+  },
+): Promise<FirstProcessingInstallationPlacementResult> {
+  const player = await readPlayerPlacementState(app, input.playerId);
+
+  if (!player?.region_id) {
+    throw new Error('Player must complete bootstrap before placing a processing installation.');
+  }
+
+  const existingExtractors = await countPlayerBuildingsByType(app, {
+    playerId: input.playerId,
+    buildingTypeIds: starterExtractorCatalog.map((entry) => entry.id),
+  });
+
+  if (existingExtractors < 1) {
+    throw new Error('Player must place the first extractor before placing a processing installation.');
+  }
+
+  const existingProcessingInstallations = await countPlayerBuildingsByType(app, {
+    playerId: input.playerId,
+    buildingTypeIds: starterProcessingInstallationCatalog.map((entry) => entry.id),
+  });
+
+  if (existingProcessingInstallations > 0) {
+    throw new Error('Player already placed the first processing installation.');
+  }
+
+  const processingInstallation = resolveStarterProcessingInstallation(input.buildingTypeId);
+  const { data: building, error: buildingError } = await app
+    .getSupabaseAdminClient()
+    .from('buildings')
+    .insert({
+      player_id: input.playerId,
+      region_id: player.region_id,
+      building_type_id: processingInstallation.id,
+      level: 1,
+    })
+    .select('id, player_id, region_id, building_type_id, level')
+    .single<{
+      id: string;
+      player_id: string;
+      region_id: RegionId;
+      building_type_id: string;
+      level: number;
+    }>();
+
+  if (buildingError || !building) {
+    throw new Error(
+      `Failed to create first processing installation: ${buildingError?.message ?? 'Unknown error'}`,
+    );
+  }
+
+  const { error: ledgerError } = await app.getSupabaseAdminClient().from('ledger_entries').insert({
+    player_id: input.playerId,
+    action_type: 'build',
+    amount: 0,
+    metadata: {
+      buildingId: building.id,
+      buildingTypeId: building.building_type_id,
+      regionId: building.region_id,
+      starterProcessingPlacement: true,
+    },
+  });
+
+  if (ledgerError) {
+    throw new Error(`Failed to create build ledger entry: ${ledgerError.message}`);
+  }
+
+  return {
+    building: {
+      id: building.id,
+      playerId: building.player_id,
+      regionId: building.region_id,
+      buildingTypeId: building.building_type_id,
+      level: building.level,
+    },
+    processingInstallation,
   };
 }
 
@@ -373,16 +501,18 @@ export async function claimProduction(
     playerId: input.playerId,
     resourceId: extractor.outputResourceId,
   });
+  const locationId = await readPlayerLocationId(app, input.playerId, 'primary_storage');
   const nextQuantity = existingQuantity + claimedQuantity;
   const { error: inventoryError } = await app.getSupabaseAdminClient().from('inventories').upsert(
     {
       player_id: input.playerId,
+      location_id: locationId,
       resource_id: extractor.outputResourceId,
       quantity: nextQuantity,
       updated_at: claimedAt.toISOString(),
     },
     {
-      onConflict: 'player_id,resource_id',
+      onConflict: 'player_id,location_id,resource_id',
     },
   );
 
@@ -468,6 +598,15 @@ export async function startTransform(
 
   if (!building) {
     throw new Error('Transform building not found for player.');
+  }
+
+  const processingInstallationsPlaced = await countPlayerBuildingsByType(app, {
+    playerId: input.playerId,
+    buildingTypeIds: starterProcessingInstallationCatalog.map((entry) => entry.id),
+  });
+
+  if (processingInstallationsPlaced < 1) {
+    throw new Error('Starter processing installation required for production.');
   }
 
   resolveTransformRecipe(building.building_type_id, input.recipeId);

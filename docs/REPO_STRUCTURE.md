@@ -5,6 +5,17 @@
 ```text
 industrial-dominion/
 ├─ docs/
+│  ├─ active/
+│  ├─ specialized/
+│  ├─ archive/
+│  ├─ AI_ENTRYPOINT.md
+│  ├─ AGENTS.md
+│  ├─ PROJECT_MEMORY.md
+│  ├─ ARCHITECTURE.md
+│  ├─ REPO_STRUCTURE.md
+│  ├─ WORKFLOW_RULES.md
+│  ├─ TASK_BACKLOG.md
+│  └─ CURRENT_TASK.md
 ├─ apps/
 │  ├─ web/
 │  └─ api/

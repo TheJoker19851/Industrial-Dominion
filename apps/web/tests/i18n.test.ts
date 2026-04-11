@@ -48,4 +48,25 @@ describe('i18n framework', () => {
     expect(toggleLocale('en')).toBe('fr');
     expect(toggleLocale('fr')).toBe('en');
   });
+
+  it('contains processor-gated starter-loop feedback keys in both locales', () => {
+    const en = i18nResources.en.translation as Record<string, unknown>;
+    const fr = i18nResources.fr.translation as Record<string, unknown>;
+
+    const enDashboard = en.dashboard as Record<string, string>;
+    const frDashboard = fr.dashboard as Record<string, string>;
+    const enGameplayErrors = en.gameplayErrors as Record<string, string>;
+    const frGameplayErrors = fr.gameplayErrors as Record<string, string>;
+
+    expect(enDashboard.transformProcessingInstallationRequired).toBeTruthy();
+    expect(frDashboard.transformProcessingInstallationRequired).toBeTruthy();
+    expect(enDashboard.ledgerBuildOutcome).toBeTruthy();
+    expect(frDashboard.ledgerBuildOutcome).toBeTruthy();
+    expect(enDashboard.ledgerTransformStartedOutcome).toBeTruthy();
+    expect(frDashboard.ledgerTransformStartedOutcome).toBeTruthy();
+    expect(enDashboard.ledgerProductionOutcome).toBeTruthy();
+    expect(frDashboard.ledgerProductionOutcome).toBeTruthy();
+    expect(enGameplayErrors.processingInstallationRequiredForProduction).toBeTruthy();
+    expect(frGameplayErrors.processingInstallationRequiredForProduction).toBeTruthy();
+  });
 });

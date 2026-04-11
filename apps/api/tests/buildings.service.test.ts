@@ -4,6 +4,7 @@ import {
   claimProduction,
   claimTransform,
   placeFirstExtractor,
+  placeFirstProcessingInstallation,
   startTransform,
 } from '../src/modules/buildings/buildings.service';
 
@@ -23,14 +24,17 @@ function createMaybeSingleQuery<T>(data: T | null) {
 
 function createAppMock(options?: {
   playerRegionId?: 'ironridge' | 'greenhaven' | 'sunbarrel' | 'riverplain' | null;
-  existingBuildingCount?: number;
+  existingExtractorCount?: number;
+  existingProcessingInstallationCount?: number;
   latestProductionCompletesAt?: string | null;
   buildingCreatedAt?: string;
   inventoryQuantity?: number;
 }) {
   const playerRegionId =
     options && 'playerRegionId' in options ? options.playerRegionId : 'ironridge';
-  const existingBuildingCount = options?.existingBuildingCount ?? 0;
+  const existingExtractorCount = options?.existingExtractorCount ?? 0;
+  const existingProcessingInstallationCount =
+    options?.existingProcessingInstallationCount ?? 0;
   const buildingCreatedAt = options?.buildingCreatedAt ?? '2026-03-15T10:00:00.000Z';
   const latestProductionCompletesAt =
     options && 'latestProductionCompletesAt' in options
@@ -69,24 +73,35 @@ function createAppMock(options?: {
   };
 
   const buildingsCountSelect = {
-    eq: vi.fn().mockResolvedValue({
-      count: existingBuildingCount,
-      error: null,
-    }),
-  };
-
-  const buildingsInsert = {
-    select: vi.fn().mockReturnValue({
-      single: vi.fn().mockResolvedValue({
-        data: {
-          id: 'building-123',
-          player_id: 'player-123',
-          region_id: playerRegionId,
-          building_type_id: 'ironridge_iron_extractor',
-          level: 1,
-        },
+    eq: vi.fn().mockReturnThis(),
+    in: vi.fn((_column: string, values: string[]) =>
+      Promise.resolve({
+        count: values.includes('starter_processing_installation')
+          ? existingProcessingInstallationCount
+          : existingExtractorCount,
         error: null,
       }),
+    ),
+  };
+
+  let lastInsertedBuildingTypeId = 'ironridge_iron_extractor';
+  const buildingsInsert = {
+    select: vi.fn().mockReturnValue({
+      single: vi.fn().mockImplementation(() =>
+        Promise.resolve({
+          data: {
+            id:
+              lastInsertedBuildingTypeId === 'starter_processing_installation'
+                ? 'building-processor-1'
+                : 'building-123',
+            player_id: 'player-123',
+            region_id: playerRegionId,
+            building_type_id: lastInsertedBuildingTypeId,
+            level: 1,
+          },
+          error: null,
+        }),
+      ),
     }),
   };
 
@@ -115,14 +130,16 @@ function createAppMock(options?: {
   const inventorySelect = {
     eq: vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        maybeSingle: vi.fn().mockResolvedValue({
-          data:
-            inventoryQuantity > 0
-              ? {
-                  quantity: inventoryQuantity,
-                }
-              : null,
-          error: null,
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data:
+              inventoryQuantity > 0
+                ? {
+                    quantity: inventoryQuantity,
+                  }
+                : null,
+            error: null,
+          }),
         }),
       }),
     }),
@@ -189,7 +206,13 @@ function createAppMock(options?: {
                     ? buildingsClaimQuery
                     : buildingsInsert,
               ),
-              insert: vi.fn().mockReturnValue(buildingsInsert),
+              insert: vi.fn((payload: Record<string, unknown>) => {
+                if (typeof payload.building_type_id === 'string') {
+                  lastInsertedBuildingTypeId = payload.building_type_id;
+                }
+
+                return buildingsInsert;
+              }),
             };
           }
 
@@ -204,6 +227,32 @@ function createAppMock(options?: {
             return {
               select: vi.fn().mockReturnValue(inventorySelect),
               upsert: inventoryUpsert,
+            };
+          }
+
+          if (table === 'player_locations') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockReturnValue({
+                    returns: vi.fn().mockResolvedValue({
+                      data: [
+                        {
+                          id: 'location-primary',
+                          key: 'primary_storage',
+                          name_key: 'locations.primary_storage.name',
+                        },
+                        {
+                          id: 'location-remote',
+                          key: 'remote_storage',
+                          name_key: 'locations.remote_storage.name',
+                        },
+                      ],
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
             };
           }
 
@@ -255,7 +304,7 @@ describe('buildings service', () => {
   });
 
   it('rejects placement when a first extractor already exists', async () => {
-    const { app } = createAppMock({ existingBuildingCount: 1 });
+    const { app } = createAppMock({ existingExtractorCount: 1 });
 
     await expect(
       placeFirstExtractor(app, {
@@ -263,6 +312,69 @@ describe('buildings service', () => {
         buildingTypeId: 'ironridge_iron_extractor',
       }),
     ).rejects.toThrow('Player already placed the first extractor.');
+  });
+
+  it('places the first starter processing installation after an extractor exists', async () => {
+    const { app, ledgerInsert } = createAppMock({
+      existingExtractorCount: 1,
+      existingProcessingInstallationCount: 0,
+    });
+
+    const result = await placeFirstProcessingInstallation(app, {
+      playerId: 'player-123',
+      buildingTypeId: 'starter_processing_installation',
+    });
+
+    expect(result.building).toEqual({
+      id: 'building-processor-1',
+      playerId: 'player-123',
+      regionId: 'ironridge',
+      buildingTypeId: 'starter_processing_installation',
+      level: 1,
+    });
+    expect(result.processingInstallation.id).toBe('starter_processing_installation');
+    expect(ledgerInsert).toHaveBeenCalled();
+  });
+
+  it('rejects starter processing installation placement before bootstrap completes', async () => {
+    const { app } = createAppMock({ playerRegionId: null });
+
+    await expect(
+      placeFirstProcessingInstallation(app, {
+        playerId: 'player-123',
+        buildingTypeId: 'starter_processing_installation',
+      }),
+    ).rejects.toThrow('Player must complete bootstrap before placing a processing installation.');
+  });
+
+  it('rejects starter processing installation placement before extractor placement', async () => {
+    const { app } = createAppMock({
+      existingExtractorCount: 0,
+      existingProcessingInstallationCount: 0,
+    });
+
+    await expect(
+      placeFirstProcessingInstallation(app, {
+        playerId: 'player-123',
+        buildingTypeId: 'starter_processing_installation',
+      }),
+    ).rejects.toThrow(
+      'Player must place the first extractor before placing a processing installation.',
+    );
+  });
+
+  it('rejects duplicate starter processing installation placement', async () => {
+    const { app } = createAppMock({
+      existingExtractorCount: 1,
+      existingProcessingInstallationCount: 1,
+    });
+
+    await expect(
+      placeFirstProcessingInstallation(app, {
+        playerId: 'player-123',
+        buildingTypeId: 'starter_processing_installation',
+      }),
+    ).rejects.toThrow('Player already placed the first processing installation.');
   });
 
   it('claims completed production into inventory for a starter extractor', async () => {
@@ -285,10 +397,11 @@ describe('buildings service', () => {
     expect(inventoryUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         player_id: 'player-123',
+        location_id: 'location-primary',
         resource_id: 'iron_ore',
         quantity: 53,
       }),
-      { onConflict: 'player_id,resource_id' },
+      { onConflict: 'player_id,location_id,resource_id' },
     );
     expect(ledgerInsert).toHaveBeenCalled();
   });
@@ -310,6 +423,7 @@ describe('buildings service', () => {
   it('starts a transform job by consuming real input inventory', async () => {
     const { app, rpc } = createAppMock({
       inventoryQuantity: 48,
+      existingProcessingInstallationCount: 1,
     });
 
     const result = await startTransform(app, {
@@ -333,6 +447,22 @@ describe('buildings service', () => {
       p_building_id: 'building-123',
       p_recipe_id: 'ironridge_iron_ingot_batch',
     });
+  });
+
+  it('rejects transform start when the starter processing installation is missing', async () => {
+    const { app, rpc } = createAppMock({
+      existingProcessingInstallationCount: 0,
+    });
+
+    await expect(
+      startTransform(app, {
+        playerId: 'player-123',
+        buildingId: 'building-123',
+        recipeId: 'ironridge_iron_ingot_batch',
+      }),
+    ).rejects.toThrow('Starter processing installation required for production.');
+
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it('claims completed transform output into inventory', async () => {

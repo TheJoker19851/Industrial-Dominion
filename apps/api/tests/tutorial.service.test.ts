@@ -8,28 +8,34 @@ import {
 
 function createAppMock(options?: {
   initialCompletedStepIds?: string[];
+  currentStep?: string | null;
   inventoryViewedAt?: string | null;
   skippedAt?: string | null;
   completedAt?: string | null;
   signalCounts?: {
-    starterGrant?: number;
     buildings?: number;
     claimProduction?: number;
     marketSell?: number;
+    marketPurchase?: number;
+    productionCompleted?: number;
+    logisticsTransfer?: number;
   };
 }) {
   const state = {
-    completed_step_ids: options?.initialCompletedStepIds ?? ['welcome', 'place_extractor', 'claim_production'],
+    current_step: options?.currentStep ?? null,
+    completed_step_ids: options?.initialCompletedStepIds ?? [],
     inventory_viewed_at: options?.inventoryViewedAt ?? null,
     skipped_at: options?.skippedAt ?? null,
     completed_at: options?.completedAt ?? null,
   };
 
   const signalCounts = {
-    starterGrant: options?.signalCounts?.starterGrant ?? 1,
-    buildings: options?.signalCounts?.buildings ?? 1,
-    claimProduction: options?.signalCounts?.claimProduction ?? 1,
+    buildings: options?.signalCounts?.buildings ?? 0,
+    claimProduction: options?.signalCounts?.claimProduction ?? 0,
     marketSell: options?.signalCounts?.marketSell ?? 0,
+    marketPurchase: options?.signalCounts?.marketPurchase ?? 0,
+    productionCompleted: options?.signalCounts?.productionCompleted ?? 0,
+    logisticsTransfer: options?.signalCounts?.logisticsTransfer ?? 0,
   };
 
   const tutorialTable = {
@@ -58,6 +64,10 @@ function createAppMock(options?: {
       }),
     }),
     update: vi.fn((patch: Record<string, unknown>) => {
+      if ('current_step' in patch) {
+        state.current_step = patch.current_step as string | null;
+      }
+
       if ('completed_step_ids' in patch) {
         state.completed_step_ids = patch.completed_step_ids as string[];
       }
@@ -121,16 +131,24 @@ function createAppMock(options?: {
                   error: null,
                   eq: vi.fn((column: string, value: string) => {
                     if (column === 'action_type') {
-                      if (value === 'starter_grant') {
-                        result.count = signalCounts.starterGrant;
-                      }
-
                       if (value === 'claim_production') {
                         result.count = signalCounts.claimProduction;
                       }
 
                       if (value === 'market_sell') {
                         result.count = signalCounts.marketSell;
+                      }
+
+                      if (value === 'market_purchase') {
+                        result.count = signalCounts.marketPurchase;
+                      }
+
+                      if (value === 'production_completed') {
+                        result.count = signalCounts.productionCompleted;
+                      }
+
+                      if (value === 'logistics_transfer_out') {
+                        result.count = signalCounts.logisticsTransfer;
                       }
                     }
 
@@ -147,23 +165,75 @@ function createAppMock(options?: {
         },
       }),
     } as unknown as FastifyInstance,
+    tutorialTable,
   };
 }
 
 describe('tutorial service', () => {
-  it('returns the next starter tutorial step for the current real loop', async () => {
+  it('returns the initial economic tutorial state for a new player', async () => {
     const { app } = createAppMock();
 
     const result = await getStarterTutorialProgress(app, 'player-123');
 
-    expect(result.currentStepId).toBe('view_inventory');
-    expect(result.currentStepIndex).toBe(4);
-    expect(result.isCompleted).toBe(false);
-    expect(result.isSkipped).toBe(false);
+    expect(result.currentStepId).toBe('extract_resource');
+    expect(result.currentStepIndex).toBe(1);
+    expect(result.totalSteps).toBe(7);
+    expect(result.completedStepIds).toEqual([]);
   });
 
-  it('advances to the market sell step when inventory has been viewed', async () => {
-    const { app } = createAppMock();
+  it('progresses normally through the economic tutorial order', async () => {
+    const { app } = createAppMock({
+      signalCounts: {
+        buildings: 1,
+        claimProduction: 1,
+        marketSell: 1,
+        marketPurchase: 1,
+        productionCompleted: 1,
+      },
+      inventoryViewedAt: '2026-03-17T10:00:00.000Z',
+    });
+
+    const result = await getStarterTutorialProgress(app, 'player-123');
+
+    expect(result.completedStepIds).toEqual([
+      'extract_resource',
+      'claim_resource',
+      'open_inventory',
+      'sell_resource',
+      'buy_resource',
+      'produce_resource',
+    ]);
+    expect(result.currentStepId).toBe('transfer_resource');
+    expect(result.currentStepIndex).toBe(7);
+  });
+
+  it('remains idempotent when the same completion signal is observed twice', async () => {
+    const { app } = createAppMock({
+      initialCompletedStepIds: ['extract_resource', 'claim_resource'],
+      currentStep: 'open_inventory',
+      signalCounts: {
+        buildings: 1,
+        claimProduction: 1,
+      },
+    });
+
+    const first = await getStarterTutorialProgress(app, 'player-123');
+    const second = await getStarterTutorialProgress(app, 'player-123');
+
+    expect(first.completedStepIds).toEqual(['extract_resource', 'claim_resource']);
+    expect(second.completedStepIds).toEqual(['extract_resource', 'claim_resource']);
+    expect(second.currentStepId).toBe('open_inventory');
+  });
+
+  it('marks inventory viewed and advances only the next valid step', async () => {
+    const { app } = createAppMock({
+      initialCompletedStepIds: ['extract_resource', 'claim_resource'],
+      currentStep: 'open_inventory',
+      signalCounts: {
+        buildings: 1,
+        claimProduction: 1,
+      },
+    });
 
     const result = await syncStarterTutorialProgress(app, {
       playerId: 'player-123',
@@ -171,33 +241,11 @@ describe('tutorial service', () => {
     });
 
     expect(result.completedStepIds).toEqual([
-      'welcome',
-      'place_extractor',
-      'claim_production',
-      'view_inventory',
+      'extract_resource',
+      'claim_resource',
+      'open_inventory',
     ]);
     expect(result.currentStepId).toBe('sell_resource');
-  });
-
-  it('marks the tutorial complete after the first market sale', async () => {
-    const { app } = createAppMock({
-      initialCompletedStepIds: [
-        'welcome',
-        'place_extractor',
-        'claim_production',
-        'view_inventory',
-      ],
-      inventoryViewedAt: '2026-03-15T12:45:00.000Z',
-      signalCounts: {
-        marketSell: 1,
-      },
-    });
-
-    const result = await getStarterTutorialProgress(app, 'player-123');
-
-    expect(result.isCompleted).toBe(true);
-    expect(result.currentStepId).toBe('complete');
-    expect(result.currentStepIndex).toBe(6);
   });
 
   it('supports skipping the tutorial', async () => {

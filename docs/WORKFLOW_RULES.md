@@ -1,46 +1,46 @@
 # WORKFLOW_RULES.md
 
-## Required read order
+## Execution pipeline (mandatory)
+1. Plan
+2. Code
+3. Review
 
-1. /docs/AGENTS.md
-2. /docs/README_START_HERE.md
-3. /docs/STACK_OVERVIEW.md
-4. /docs/FRONTEND_DECISION.md
-5. /docs/BACKEND_DECISION.md
-6. /docs/PROJECT_MEMORY.md
-7. /docs/ROADMAP.md
-8. /docs/ARCHITECTURE.md
-9. /docs/MOBILE_STRATEGY.md
-10. /docs/SECURITY_RULES.md
-11. /docs/DB_SCHEMA_OVERVIEW.md
-12. /docs/CONFIG_SYSTEM.md
-13. /docs/ENV_SETUP.md
-14. /docs/MIGRATION_RULES.md
-15. /docs/ENVIRONMENTS.md
-16. /docs/GAME_DESIGN.md
-17. /docs/WORLD_SEED.md
-18. /docs/ECONOMY_RULES.md
-19. /docs/ECONOMIC_ENGINE.md
-20. /docs/MACRO_CYCLE_SYSTEM.md
-21. /docs/CONTENT_MODEL.md
-22. /docs/UI_GRAPHICS_GUIDE.md
-23. /docs/I18N_GUIDE.md
-24. /docs/MONETIZATION.md
-25. /docs/TESTING_STRATEGY.md
-26. /docs/CODE_STYLE.md
-27. /docs/REPO_STRUCTURE.md
-28. /docs/TASK_BACKLOG.md
-29. /docs/CURRENT_TASK.md
-30. /docs/JOURNAL.md
-31. /docs/CODEX_START_PROMPT.md
+## Plan (mandatory)
+- Explain intent and scope before coding.
+- Identify impacted files and dependencies.
+- State tests/checks to run.
 
-## Autonomous loop
+## Code (mandatory)
+- Max 3–5 files modified per step unless explicitly justified.
+- No large uncontrolled refactors.
+- No architecture or stack changes without explicit approval.
+- No unrelated improvements or speculative expansions.
 
-1. Select the first valid unchecked task whose dependencies are satisfied.
+## Review (mandatory)
+- Summarize changes after implementation.
+- Confirm acceptance criteria.
+- Note risks, gaps, and follow-ups.
+- Update CURRENT_TASK and TASK_BACKLOG.
+- Update JOURNAL when work is completed.
+- Stop after the summary unless explicitly asked to continue.
+
+## Safeguards against agent drift
+- Prevent over-engineering: choose the minimal viable change.
+- Prevent unnecessary file edits: change only impacted files.
+- Prevent architecture drift: do not introduce new patterns without checking existing ones.
+- Prevent scope creep: only backlog-defined work.
+
+## Stop conditions
+- Missing requirements, secrets, or approvals.
+- Task scope remains unclear after reading core docs.
+- Required tests fail and no safe fix exists.
+- File limit exceeded without a documented justification.
+
+## Autonomous loop (only when explicitly requested)
+1. Select the first ready task whose dependencies are satisfied.
 2. Copy it into CURRENT_TASK.md.
-3. Implement it end-to-end.
+3. Execute Plan → Code → Review.
 4. Run relevant checks.
-5. Fix issues caused by the change.
-6. Mark the task done.
-7. Update CURRENT_TASK.md and JOURNAL.md.
-8. Stop with a concise summary.
+5. Mark the task done in TASK_BACKLOG.md.
+6. Update CURRENT_TASK.md and JOURNAL.
+7. Stop with a concise summary.

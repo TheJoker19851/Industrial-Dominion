@@ -11,8 +11,7 @@ import { skipStarterTutorial, getStarterTutorial } from './tutorial-api';
 
 function getTutorialStepPath(stepId: StarterTutorialStepId) {
   switch (stepId) {
-    case 'welcome':
-      return '/onboarding';
+    case 'buy_resource':
     case 'sell_resource':
       return '/market';
     default:

@@ -13,3 +13,11 @@ export function clampBuyQuantity(value: number) {
 
   return Math.floor(value);
 }
+
+export function clampOrderPrice(value: number) {
+  if (!Number.isFinite(value) || value < 1) {
+    return 1;
+  }
+
+  return Math.floor(value);
+}

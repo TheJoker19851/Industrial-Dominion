@@ -12,6 +12,12 @@ describe('gameplay error localization mapping', () => {
     expect(getGameplayErrorKey('Invalid bootstrap payload.')).toBe(
       'gameplayErrors.invalidBootstrapPayload',
     );
+    expect(getGameplayErrorKey('Transfer source and destination must be different.')).toBe(
+      'gameplayErrors.transferLocationsMustDiffer',
+    );
+    expect(getGameplayErrorKey('Starter processing installation required for production.')).toBe(
+      'gameplayErrors.processingInstallationRequiredForProduction',
+    );
   });
 
   it('falls back to a generic localized error key', () => {

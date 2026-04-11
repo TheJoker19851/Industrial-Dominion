@@ -43,7 +43,8 @@ values
   ('ironridge_iron_extractor', 'buildingTypes.ironridge_iron_extractor.name', 'extraction'),
   ('greenhaven_timber_extractor', 'buildingTypes.greenhaven_timber_extractor.name', 'extraction'),
   ('sunbarrel_oil_extractor', 'buildingTypes.sunbarrel_oil_extractor.name', 'extraction'),
-  ('riverplain_water_extractor', 'buildingTypes.riverplain_water_extractor.name', 'extraction')
+  ('riverplain_water_extractor', 'buildingTypes.riverplain_water_extractor.name', 'extraction'),
+  ('starter_processing_installation', 'buildingTypes.starter_processing_installation.name', 'processing')
 on conflict (id) do update
 set
   name_key = excluded.name_key,
@@ -61,6 +62,23 @@ values
   ('ironridge_iron_ingot_batch', 'iron_ore', 'iron_ingot', 12, 6, 3600)
 on conflict (id) do update
 set
+  input_resource_id = excluded.input_resource_id,
+  output_resource_id = excluded.output_resource_id,
+  input_amount = excluded.input_amount,
+  output_amount = excluded.output_amount,
+  duration_seconds = excluded.duration_seconds;
+
+insert into recipes (
+  id,
+  input_resource_id,
+  output_resource_id,
+  input_amount,
+  output_amount,
+  duration_seconds
+)
+values
+  ('iron_ingot_from_iron_ore', 'iron_ore', 'iron_ingot', 2, 1, 1)
+on conflict (id) do update set
   input_resource_id = excluded.input_resource_id,
   output_resource_id = excluded.output_resource_id,
   input_amount = excluded.input_amount,

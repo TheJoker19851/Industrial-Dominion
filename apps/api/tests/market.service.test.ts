@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { buyResource, getMarketSnapshot, sellResource } from '../src/modules/market/market.service';
+import {
+  buyResource,
+  createMarketOrder,
+  getMarketSnapshot,
+  sellResource,
+} from '../src/modules/market/market.service';
 
 function createAppMock(options?: {
   player?: {
@@ -11,15 +16,27 @@ function createAppMock(options?: {
   } | null;
   inventoryRows?: Array<{
     player_id: string;
-    resource_id: 'iron_ore' | 'coal' | 'wood' | 'crude_oil' | 'sand' | 'water' | 'crops';
+    location_id: string;
+    resource_id: 'iron_ore' | 'iron_ingot' | 'coal' | 'wood' | 'crude_oil' | 'sand' | 'water' | 'crops';
     quantity: number;
     resources: {
       base_price: number;
       tradable: boolean;
     } | null;
   }>;
+  orderRows?: Array<{
+    id: string;
+    resource_id: 'iron_ore' | 'iron_ingot' | 'coal' | 'wood' | 'crude_oil' | 'sand' | 'water' | 'crops';
+    side: 'buy' | 'sell';
+    price_per_unit: number;
+    quantity: number;
+    remaining_quantity: number;
+    status: 'open' | 'filled' | 'cancelled';
+    created_at: string;
+  }>;
   rpcError?: string | null;
   buyRpcError?: string | null;
+  orderRpcError?: string | null;
 }) {
   const player =
     options && 'player' in options
@@ -33,12 +50,25 @@ function createAppMock(options?: {
   const inventoryRows = options?.inventoryRows ?? [
     {
       player_id: 'player-123',
+      location_id: 'location-primary',
       resource_id: 'iron_ore' as const,
       quantity: 48,
       resources: {
         base_price: 18,
         tradable: true,
       },
+    },
+  ];
+  const orderRows = options?.orderRows ?? [
+    {
+      id: 'order-open-1',
+      resource_id: 'iron_ore' as const,
+      side: 'buy' as const,
+      price_per_unit: 15,
+      quantity: 10,
+      remaining_quantity: 10,
+      status: 'open' as const,
+      created_at: '2026-03-17T18:00:00.000Z',
     },
   ];
 
@@ -60,23 +90,24 @@ function createAppMock(options?: {
           }
 
           if (table === 'inventories') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  gt: vi.fn().mockReturnValue({
-                    order: vi.fn().mockReturnValue({
-                      returns: vi.fn().mockResolvedValue({
-                        data: inventoryRows,
-                        error: null,
-                      }),
-                    }),
-                  }),
+            const inventoryQuery = {
+              eq: vi.fn().mockReturnThis(),
+              in: vi.fn().mockReturnThis(),
+              gt: vi.fn().mockReturnThis(),
+              order: vi.fn().mockReturnValue({
+                returns: vi.fn().mockResolvedValue({
+                  data: inventoryRows,
+                  error: null,
                 }),
               }),
             };
+
+            return {
+              select: vi.fn().mockReturnValue(inventoryQuery),
+            };
           }
 
-          if (table === 'resources') {
+          if (table === 'player_locations') {
             return {
               select: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
@@ -84,14 +115,14 @@ function createAppMock(options?: {
                     returns: vi.fn().mockResolvedValue({
                       data: [
                         {
-                          id: 'coal',
-                          base_price: 12,
-                          tradable: true,
+                          id: 'location-primary',
+                          key: 'primary_storage',
+                          name_key: 'locations.primary_storage.name',
                         },
                         {
-                          id: 'iron_ore',
-                          base_price: 18,
-                          tradable: true,
+                          id: 'location-remote',
+                          key: 'remote_storage',
+                          name_key: 'locations.remote_storage.name',
                         },
                       ],
                       error: null,
@@ -102,10 +133,109 @@ function createAppMock(options?: {
             };
           }
 
+          if (table === 'resources') {
+            let selectedResourceId: 'coal' | 'iron_ore' = 'coal';
+            const resourceQuery = {
+              eq: vi.fn((column: string, value: string) => {
+                if (column === 'id' && (value === 'coal' || value === 'iron_ore')) {
+                  selectedResourceId = value;
+                }
+
+                return resourceQuery;
+              }),
+              maybeSingle: vi.fn().mockImplementation(() =>
+                Promise.resolve({
+                  data:
+                    selectedResourceId === 'iron_ore'
+                      ? {
+                          id: 'iron_ore',
+                          base_price: 18,
+                          tradable: true,
+                        }
+                      : {
+                          id: 'coal',
+                          base_price: 12,
+                          tradable: true,
+                        },
+                  error: null,
+                }),
+              ),
+              order: vi.fn().mockReturnValue({
+                returns: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 'coal',
+                      base_price: 12,
+                      tradable: true,
+                    },
+                    {
+                      id: 'iron_ore',
+                      base_price: 18,
+                      tradable: true,
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            };
+
+            return {
+              select: vi.fn().mockReturnValue(resourceQuery),
+            };
+          }
+
+          if (table === 'market_orders') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockReturnValue({
+                      returns: vi.fn().mockResolvedValue({
+                        data: orderRows,
+                        error: null,
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            };
+          }
+
           throw new Error(`Unexpected table ${table}`);
         },
-        rpc: vi.fn().mockImplementation((fn: string) => {
-          if (fn === 'buy_market_resource') {
+        rpc: vi.fn().mockImplementation((fn: string, payload?: Record<string, unknown>) => {
+          if (fn === 'create_market_limit_order') {
+            if (options?.orderRpcError) {
+              return Promise.resolve({
+                data: null,
+                error: {
+                  message: options.orderRpcError,
+                },
+              });
+            }
+
+            return Promise.resolve({
+              data: [
+                {
+                  order_id: 'limit-order-123',
+                  resource_id: 'iron_ore',
+                  side: 'buy',
+                  price_per_unit: 15,
+                  quantity: 10,
+                  remaining_quantity: 0,
+                  status: 'filled',
+                  player_credits: 2350,
+                  inventory_quantity: 58,
+                  matched_order_id: 'sell-order-321',
+                  trade_id: 'trade-123',
+                  created_at: '2026-03-17T18:00:00.000Z',
+                },
+              ],
+              error: null,
+            });
+          }
+
+          if (fn === 'buy_market_resource_at_location') {
             if (options?.buyRpcError) {
               return Promise.resolve({
                 data: null,
@@ -116,42 +246,96 @@ function createAppMock(options?: {
             }
 
             return Promise.resolve({
-              data: [
-                {
-                  order_id: 'buy-order-123',
-                  price_per_unit: 12,
-                  total_cost: 120,
-                  inventory_quantity: 10,
-                  player_credits: 2380,
-                },
-              ],
+              data: payload
+                ? [
+                    {
+                      order_id: 'buy-order-123',
+                      price_per_unit: Number(payload.p_price_per_unit),
+                      total_cost: Number(payload.p_price_per_unit) * Number(payload.p_quantity),
+                      inventory_quantity: Number(payload.p_quantity),
+                      player_credits:
+                        2500 - Number(payload.p_price_per_unit) * Number(payload.p_quantity),
+                      location_id: 'location-primary',
+                      market_context_key: 'region_anchor',
+                    },
+                  ]
+                : [
+                    {
+                      order_id: 'buy-order-123',
+                      price_per_unit: 13,
+                      total_cost: 130,
+                      inventory_quantity: 10,
+                      player_credits: 2370,
+                      location_id: 'location-primary',
+                      market_context_key: 'region_anchor',
+                    },
+                  ],
               error: null,
             });
           }
 
-          return Promise.resolve(
-            options?.rpcError
-              ? {
-                  data: null,
-                  error: {
-                    message: options.rpcError,
-                  },
-                }
-              : {
-                  data: [
-                    {
-                      order_id: 'order-123',
-                      price_per_unit: 18,
-                      gross_amount: 180,
-                      fee_amount: 4,
-                      net_amount: 176,
-                      inventory_quantity: 38,
-                      player_credits: 2676,
+          if (fn === 'sell_inventory_resource_at_location') {
+            if (!payload) {
+              return Promise.resolve(
+                options?.rpcError
+                  ? {
+                      data: null,
+                      error: {
+                        message: options.rpcError,
+                      },
+                    }
+                  : {
+                      data: [
+                        {
+                          order_id: 'order-123',
+                          price_per_unit: 15,
+                          gross_amount: 150,
+                          fee_amount: 3,
+                          net_amount: 147,
+                          inventory_quantity: 38,
+                          player_credits: 2647,
+                          location_id: 'location-primary',
+                          market_context_key: 'region_anchor',
+                        },
+                      ],
+                      error: null,
                     },
-                  ],
-                  error: null,
-                },
-          );
+              );
+            }
+
+            const quantity = Number(payload.p_quantity);
+            const price = Number(payload.p_price_per_unit);
+            const grossAmount = price * quantity;
+            const feeAmount = Math.round(grossAmount * Number(payload.p_fee_rate ?? 0));
+
+            return Promise.resolve(
+              options?.rpcError
+                ? {
+                    data: null,
+                    error: {
+                      message: options.rpcError,
+                    },
+                  }
+                : {
+                    data: [
+                      {
+                        order_id: 'order-123',
+                        price_per_unit: price,
+                        gross_amount: grossAmount,
+                        fee_amount: feeAmount,
+                        net_amount: grossAmount - feeAmount,
+                        inventory_quantity: 48 - quantity,
+                        player_credits: 2500 + grossAmount - feeAmount,
+                        location_id: 'location-primary',
+                        market_context_key: 'region_anchor',
+                      },
+                    ],
+                    error: null,
+                  },
+            );
+          }
+
+          throw new Error(`Unexpected rpc ${fn}`);
         }),
       }),
     } as unknown as FastifyInstance,
@@ -171,15 +355,41 @@ describe('market service', () => {
         credits: 2500,
         regionId: 'ironridge',
       },
+      contexts: [
+        {
+          key: 'region_anchor',
+          labelKey: 'regions.ironridge.name',
+          descriptionKey: 'market.contextDescriptions.region_anchor',
+          locationId: 'location-primary',
+          locationNameKey: 'locations.primary_storage.name',
+          focusResourceId: 'iron_ore',
+        },
+        {
+          key: 'trade_hub',
+          labelKey: 'dashboard.network.tradeHubTitle',
+          descriptionKey: 'market.contextDescriptions.trade_hub',
+          locationId: 'location-remote',
+          locationNameKey: 'locations.remote_storage.name',
+          focusResourceId: 'iron_ingot',
+        },
+      ],
       marketFeeRate: 0.02,
       offers: [
         {
           resourceId: 'coal',
           basePrice: 12,
+          contextPrices: [
+            { contextKey: 'region_anchor', price: 13, modifierPercent: 0.08 },
+            { contextKey: 'trade_hub', price: 13, modifierPercent: 0.08 },
+          ],
         },
         {
           resourceId: 'iron_ore',
           basePrice: 18,
+          contextPrices: [
+            { contextKey: 'region_anchor', price: 16, modifierPercent: -0.11 },
+            { contextKey: 'trade_hub', price: 20, modifierPercent: 0.11 },
+          ],
         },
       ],
       inventory: [
@@ -187,9 +397,25 @@ describe('market service', () => {
           resourceId: 'iron_ore',
           quantity: 48,
           basePrice: 18,
-          grossValue: 864,
-          feeAmount: 17,
-          netValue: 847,
+          effectivePrice: 15,
+          grossValue: 720,
+          feeAmount: 14,
+          netValue: 706,
+          marketContextKey: 'region_anchor',
+          locationId: 'location-primary',
+          locationNameKey: 'locations.primary_storage.name',
+        },
+      ],
+      orders: [
+        {
+          id: 'order-open-1',
+          resourceId: 'iron_ore',
+          side: 'buy',
+          pricePerUnit: 15,
+          quantity: 10,
+          remainingQuantity: 10,
+          status: 'open',
+          createdAt: '2026-03-17T18:00:00.000Z',
         },
       ],
     });
@@ -202,18 +428,21 @@ describe('market service', () => {
       playerId: 'player-123',
       resourceId: 'iron_ore',
       quantity: 10,
+      marketContextKey: 'region_anchor',
     });
 
     expect(result).toEqual({
-      playerCredits: 2676,
+      playerCredits: 2647,
       resourceId: 'iron_ore',
       quantitySold: 10,
       inventoryQuantity: 38,
-      pricePerUnit: 18,
-      grossAmount: 180,
-      feeAmount: 4,
-      netAmount: 176,
+      pricePerUnit: 15,
+      grossAmount: 150,
+      feeAmount: 3,
+      netAmount: 147,
       orderId: 'order-123',
+      marketContextKey: 'region_anchor',
+      locationId: 'location-primary',
     });
   });
 
@@ -224,16 +453,19 @@ describe('market service', () => {
       playerId: 'player-123',
       resourceId: 'coal',
       quantity: 10,
+      marketContextKey: 'region_anchor',
     });
 
     expect(result).toEqual({
-      playerCredits: 2380,
+      playerCredits: 2370,
       resourceId: 'coal',
       quantityPurchased: 10,
       inventoryQuantity: 10,
-      pricePerUnit: 12,
-      totalCost: 120,
+      pricePerUnit: 13,
+      totalCost: 130,
       orderId: 'buy-order-123',
+      marketContextKey: 'region_anchor',
+      locationId: 'location-primary',
     });
   });
 
@@ -247,6 +479,7 @@ describe('market service', () => {
         playerId: 'player-123',
         resourceId: 'iron_ore',
         quantity: 99,
+        marketContextKey: 'region_anchor',
       }),
     ).rejects.toThrow('Not enough inventory to sell.');
   });
@@ -261,7 +494,63 @@ describe('market service', () => {
         playerId: 'player-123',
         resourceId: 'coal',
         quantity: 999,
+        marketContextKey: 'region_anchor',
       }),
     ).rejects.toThrow('Not enough credits to buy resource.');
+  });
+
+  it('creates and immediately matches a limit order through the market rpc', async () => {
+    const { app } = createAppMock();
+
+    const result = await createMarketOrder(app, {
+      playerId: 'player-123',
+      resourceId: 'iron_ore',
+      side: 'buy',
+      price: 15,
+      quantity: 10,
+    });
+
+    expect(result).toEqual({
+      orderId: 'limit-order-123',
+      resourceId: 'iron_ore',
+      side: 'buy',
+      pricePerUnit: 15,
+      quantity: 10,
+      remainingQuantity: 0,
+      status: 'filled',
+      playerCredits: 2350,
+      inventoryQuantity: 58,
+      matchedOrderId: 'sell-order-321',
+      tradeId: 'trade-123',
+      createdAt: '2026-03-17T18:00:00.000Z',
+    });
+  });
+
+  it('surfaces limit order validation errors', async () => {
+    const { app } = createAppMock({
+      orderRpcError: 'Not enough credits to place buy order.',
+    });
+
+    await expect(
+      createMarketOrder(app, {
+        playerId: 'player-123',
+        resourceId: 'iron_ore',
+        side: 'buy',
+        price: 15,
+        quantity: 10,
+      }),
+    ).rejects.toThrow('Not enough credits to place buy order.');
+  });
+
+  it('keeps instant trade quotes valid when no player orders exist', async () => {
+    const { app } = createAppMock({
+      orderRows: [],
+    });
+
+    const result = await getMarketSnapshot(app, 'player-123');
+
+    expect(result.orders).toEqual([]);
+    expect(result.offers[0]?.contextPrices[0]?.price).toBe(13);
+    expect(result.inventory[0]?.effectivePrice).toBe(15);
   });
 });

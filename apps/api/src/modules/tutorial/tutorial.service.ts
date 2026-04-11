@@ -7,9 +7,17 @@ import {
   type StarterTutorialStepId,
 } from '@industrial-dominion/shared';
 
+type LegacyTutorialStepId =
+  | 'welcome'
+  | 'place_extractor'
+  | 'claim_production'
+  | 'view_inventory'
+  | 'sell_resource';
+
 type TutorialProgressRow = {
   player_id: string;
   tutorial_id: 'starter_loop';
+  current_step: StarterTutorialStepId | null;
   completed_step_ids: unknown;
   inventory_viewed_at: string | null;
   skipped_at: string | null;
@@ -17,10 +25,12 @@ type TutorialProgressRow = {
 };
 
 type TutorialSignals = {
-  hasStarterGrant: boolean;
   hasExtractor: boolean;
   hasProductionClaim: boolean;
   hasMarketSell: boolean;
+  hasMarketBuy: boolean;
+  hasProductionCompleted: boolean;
+  hasLogisticsTransfer: boolean;
 };
 
 type CountResult = {
@@ -30,15 +40,51 @@ type CountResult = {
 
 const TUTORIAL_ID = 'starter_loop';
 
+function appendCompletedStep(
+  completedStepIds: StarterTutorialActionStepId[],
+  stepId: StarterTutorialActionStepId,
+) {
+  if (!completedStepIds.includes(stepId)) {
+    completedStepIds.push(stepId);
+  }
+}
+
 function normalizeCompletedStepIds(value: unknown): StarterTutorialActionStepId[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  return value.filter((entry): entry is StarterTutorialActionStepId =>
-    typeof entry === 'string' &&
-    starterTutorialActionStepIds.includes(entry as StarterTutorialActionStepId),
-  );
+  const normalized: StarterTutorialActionStepId[] = [];
+
+  for (const entry of value) {
+    if (typeof entry !== 'string') {
+      continue;
+    }
+
+    if (starterTutorialActionStepIds.includes(entry as StarterTutorialActionStepId)) {
+      appendCompletedStep(normalized, entry as StarterTutorialActionStepId);
+      continue;
+    }
+
+    switch (entry as LegacyTutorialStepId) {
+      case 'place_extractor':
+        appendCompletedStep(normalized, 'extract_resource');
+        break;
+      case 'claim_production':
+        appendCompletedStep(normalized, 'claim_resource');
+        break;
+      case 'view_inventory':
+        appendCompletedStep(normalized, 'open_inventory');
+        break;
+      case 'sell_resource':
+        appendCompletedStep(normalized, 'sell_resource');
+        break;
+      default:
+        break;
+    }
+  }
+
+  return normalized;
 }
 
 function getCurrentStepId(input: {
@@ -59,22 +105,24 @@ function getCurrentStepId(input: {
 
 function getCurrentStepIndex(stepId: StarterTutorialStepId) {
   return stepId === 'complete'
-    ? starterTutorialSteps.length
-    : starterTutorialSteps.findIndex((step) => step.id === stepId) + 1;
+    ? starterTutorialActionStepIds.length
+    : starterTutorialActionStepIds.findIndex((entry) => entry === stepId) + 1;
 }
 
 function mapTutorialProgress(row: TutorialProgressRow): StarterTutorialProgress {
   const completedStepIds = normalizeCompletedStepIds(row.completed_step_ids);
-  const currentStepId = getCurrentStepId({
-    completedStepIds,
-    completedAt: row.completed_at,
-  });
+  const currentStepId =
+    row.current_step ??
+    getCurrentStepId({
+      completedStepIds,
+      completedAt: row.completed_at,
+    });
 
   return {
     tutorialId: TUTORIAL_ID,
     currentStepId,
     currentStepIndex: getCurrentStepIndex(currentStepId),
-    totalSteps: starterTutorialSteps.length,
+    totalSteps: starterTutorialActionStepIds.length,
     isSkipped: Boolean(row.skipped_at),
     isCompleted: Boolean(row.completed_at),
     completedStepIds,
@@ -93,7 +141,7 @@ async function readTutorialRow(app: FastifyInstance, playerId: string) {
     .getSupabaseAdminClient()
     .from('player_tutorial_progress')
     .select(
-      'player_id, tutorial_id, completed_step_ids, inventory_viewed_at, skipped_at, completed_at',
+      'player_id, tutorial_id, current_step, completed_step_ids, inventory_viewed_at, skipped_at, completed_at',
     )
     .eq('player_id', playerId)
     .maybeSingle<TutorialProgressRow>();
@@ -132,31 +180,120 @@ async function loadTutorialSignals(
   app: FastifyInstance,
   playerId: string,
 ): Promise<TutorialSignals> {
-  const [starterGrantCount, extractorCount, productionClaimCount, marketSellCount] =
-    await Promise.all([
-      countRecords(app, 'ledger_entries', {
-        player_id: playerId,
-        action_type: 'starter_grant',
-      }),
-      countRecords(app, 'buildings', {
-        player_id: playerId,
-      }),
-      countRecords(app, 'ledger_entries', {
-        player_id: playerId,
-        action_type: 'claim_production',
-      }),
-      countRecords(app, 'ledger_entries', {
-        player_id: playerId,
-        action_type: 'market_sell',
-      }),
-    ]);
+  const [
+    extractorCount,
+    productionClaimCount,
+    marketSellCount,
+    marketBuyCount,
+    productionCompletedCount,
+    logisticsTransferCount,
+  ] = await Promise.all([
+    countRecords(app, 'buildings', {
+      player_id: playerId,
+    }),
+    countRecords(app, 'ledger_entries', {
+      player_id: playerId,
+      action_type: 'claim_production',
+    }),
+    countRecords(app, 'ledger_entries', {
+      player_id: playerId,
+      action_type: 'market_sell',
+    }),
+    countRecords(app, 'ledger_entries', {
+      player_id: playerId,
+      action_type: 'market_purchase',
+    }),
+    countRecords(app, 'ledger_entries', {
+      player_id: playerId,
+      action_type: 'production_completed',
+    }),
+    countRecords(app, 'ledger_entries', {
+      player_id: playerId,
+      action_type: 'logistics_transfer_out',
+    }),
+  ]);
 
   return {
-    hasStarterGrant: starterGrantCount > 0,
     hasExtractor: extractorCount > 0,
     hasProductionClaim: productionClaimCount > 0,
     hasMarketSell: marketSellCount > 0,
+    hasMarketBuy: marketBuyCount > 0,
+    hasProductionCompleted: productionCompletedCount > 0,
+    hasLogisticsTransfer: logisticsTransferCount > 0,
   };
+}
+
+function buildSyncedStepIds(
+  row: TutorialProgressRow,
+  signals: TutorialSignals,
+): StarterTutorialActionStepId[] {
+  const synced: StarterTutorialActionStepId[] = [];
+  const completedSet = new Set(normalizeCompletedStepIds(row.completed_step_ids));
+
+  if (completedSet.has('extract_resource') || signals.hasExtractor) {
+    synced.push('extract_resource');
+  }
+
+  if (
+    synced.includes('extract_resource') &&
+    (completedSet.has('claim_resource') || signals.hasProductionClaim)
+  ) {
+    synced.push('claim_resource');
+  }
+
+  if (
+    synced.includes('claim_resource') &&
+    (completedSet.has('open_inventory') || Boolean(row.inventory_viewed_at))
+  ) {
+    synced.push('open_inventory');
+  }
+
+  if (
+    synced.includes('open_inventory') &&
+    (completedSet.has('sell_resource') || signals.hasMarketSell)
+  ) {
+    synced.push('sell_resource');
+  }
+
+  if (
+    synced.includes('sell_resource') &&
+    (completedSet.has('buy_resource') || signals.hasMarketBuy)
+  ) {
+    synced.push('buy_resource');
+  }
+
+  if (
+    synced.includes('buy_resource') &&
+    (completedSet.has('produce_resource') || signals.hasProductionCompleted)
+  ) {
+    synced.push('produce_resource');
+  }
+
+  if (
+    synced.includes('produce_resource') &&
+    (completedSet.has('transfer_resource') || signals.hasLogisticsTransfer)
+  ) {
+    synced.push('transfer_resource');
+  }
+
+  return synced;
+}
+
+function areStepIdsEqual(
+  left: StarterTutorialActionStepId[],
+  right: StarterTutorialActionStepId[],
+) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function getPersistedCurrentStepId(
+  completedStepIds: StarterTutorialActionStepId[],
+  completedAt: string | null,
+): StarterTutorialStepId {
+  return getCurrentStepId({
+    completedStepIds,
+    completedAt,
+  });
 }
 
 async function createTutorialRow(
@@ -164,19 +301,19 @@ async function createTutorialRow(
   playerId: string,
   signals: TutorialSignals,
 ) {
-  const completedStepIds: StarterTutorialActionStepId[] = [];
-
-  if (signals.hasStarterGrant) {
-    completedStepIds.push('welcome');
-  }
-
-  if (completedStepIds.includes('welcome') && signals.hasExtractor) {
-    completedStepIds.push('place_extractor');
-  }
-
-  if (completedStepIds.includes('place_extractor') && signals.hasProductionClaim) {
-    completedStepIds.push('claim_production');
-  }
+  const baseRow: TutorialProgressRow = {
+    player_id: playerId,
+    tutorial_id: TUTORIAL_ID,
+    current_step: 'extract_resource',
+    completed_step_ids: [],
+    inventory_viewed_at: null,
+    skipped_at: null,
+    completed_at: null,
+  };
+  const completedStepIds = buildSyncedStepIds(baseRow, signals);
+  const completedAt = completedStepIds.includes('transfer_resource')
+    ? new Date().toISOString()
+    : null;
 
   const { data, error } = await app
     .getSupabaseAdminClient()
@@ -184,10 +321,12 @@ async function createTutorialRow(
     .insert({
       player_id: playerId,
       tutorial_id: TUTORIAL_ID,
+      current_step: getPersistedCurrentStepId(completedStepIds, completedAt),
       completed_step_ids: completedStepIds,
+      completed_at: completedAt,
     })
     .select(
-      'player_id, tutorial_id, completed_step_ids, inventory_viewed_at, skipped_at, completed_at',
+      'player_id, tutorial_id, current_step, completed_step_ids, inventory_viewed_at, skipped_at, completed_at',
     )
     .single<TutorialProgressRow>();
 
@@ -213,6 +352,7 @@ async function persistTutorialRow(
   app: FastifyInstance,
   playerId: string,
   patch: Partial<{
+    current_step: StarterTutorialStepId;
     completed_step_ids: StarterTutorialActionStepId[];
     inventory_viewed_at: string | null;
     skipped_at: string | null;
@@ -228,7 +368,7 @@ async function persistTutorialRow(
     })
     .eq('player_id', playerId)
     .select(
-      'player_id, tutorial_id, completed_step_ids, inventory_viewed_at, skipped_at, completed_at',
+      'player_id, tutorial_id, current_step, completed_step_ids, inventory_viewed_at, skipped_at, completed_at',
     )
     .single<TutorialProgressRow>();
 
@@ -239,55 +379,6 @@ async function persistTutorialRow(
   return data;
 }
 
-function buildSyncedStepIds(
-  row: TutorialProgressRow,
-  signals: TutorialSignals,
-): StarterTutorialActionStepId[] {
-  const synced: StarterTutorialActionStepId[] = [];
-  const completedSet = new Set(normalizeCompletedStepIds(row.completed_step_ids));
-
-  if (completedSet.has('welcome') || signals.hasStarterGrant) {
-    synced.push('welcome');
-  }
-
-  if (synced.includes('welcome') && (completedSet.has('place_extractor') || signals.hasExtractor)) {
-    synced.push('place_extractor');
-  }
-
-  if (
-    synced.includes('place_extractor') &&
-    (completedSet.has('claim_production') || signals.hasProductionClaim)
-  ) {
-    synced.push('claim_production');
-  }
-
-  if (
-    synced.includes('claim_production') &&
-    (completedSet.has('view_inventory') || Boolean(row.inventory_viewed_at))
-  ) {
-    synced.push('view_inventory');
-  }
-
-  if (
-    synced.includes('view_inventory') &&
-    (completedSet.has('sell_resource') || signals.hasMarketSell)
-  ) {
-    synced.push('sell_resource');
-  }
-
-  return synced;
-}
-
-function areStepIdsEqual(
-  left: StarterTutorialActionStepId[],
-  right: StarterTutorialActionStepId[],
-) {
-  return (
-    left.length === right.length &&
-    left.every((value, index) => value === right[index])
-  );
-}
-
 export async function getStarterTutorialProgress(
   app: FastifyInstance,
   playerId: string,
@@ -296,15 +387,18 @@ export async function getStarterTutorialProgress(
   const signals = await loadTutorialSignals(app, playerId);
   const syncedStepIds = buildSyncedStepIds(row, signals);
   const completedAt =
-    syncedStepIds.includes('sell_resource') && !row.completed_at
+    syncedStepIds.includes('transfer_resource') && !row.completed_at
       ? new Date().toISOString()
       : row.completed_at;
+  const currentStep = getPersistedCurrentStepId(syncedStepIds, completedAt);
 
   if (
     !areStepIdsEqual(syncedStepIds, normalizeCompletedStepIds(row.completed_step_ids)) ||
-    completedAt !== row.completed_at
+    completedAt !== row.completed_at ||
+    currentStep !== row.current_step
   ) {
     row = await persistTutorialRow(app, playerId, {
+      current_step: currentStep,
       completed_step_ids: syncedStepIds,
       completed_at: completedAt,
     });

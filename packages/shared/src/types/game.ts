@@ -1,4 +1,5 @@
 export type SupportedLocale = 'en' | 'fr';
+export type PlayerLocationKey = 'primary_storage' | 'remote_storage';
 
 export const starterRegionIds = [
   'ironridge',
@@ -17,6 +18,17 @@ export type ResourceId =
   | 'sand'
   | 'water'
   | 'crops';
+
+export const resourceIds = [
+  'iron_ore',
+  'iron_ingot',
+  'coal',
+  'wood',
+  'crude_oil',
+  'sand',
+  'water',
+  'crops',
+] as const satisfies readonly ResourceId[];
 
 export const starterResourceIds = [
   'iron_ore',
@@ -53,17 +65,21 @@ export type LedgerActionType =
   | 'production_transform_started'
   | 'production_completed'
   | 'claim_production'
+  | 'logistics_transfer_out'
+  | 'logistics_transfer_in'
   | 'market_purchase'
   | 'market_sell'
   | 'market_fee'
   | 'maintenance';
 
 export type StarterTutorialActionStepId =
-  | 'welcome'
-  | 'place_extractor'
-  | 'claim_production'
-  | 'view_inventory'
-  | 'sell_resource';
+  | 'extract_resource'
+  | 'claim_resource'
+  | 'open_inventory'
+  | 'sell_resource'
+  | 'buy_resource'
+  | 'produce_resource'
+  | 'transfer_resource';
 
 export type StarterTutorialStepId =
   | StarterTutorialActionStepId
@@ -116,6 +132,16 @@ export interface ProductionTransformRecipeDefinition {
   durationSeconds: number;
 }
 
+export interface ProductionRecipeDefinition {
+  key: string;
+  nameKey: string;
+  descriptionKey: string;
+  inputResourceId: ResourceId;
+  inputAmount: number;
+  outputResourceId: ResourceId;
+  outputAmount: number;
+}
+
 export interface StarterExtractorDefinition extends BuildingTypeDefinition {
   descriptionKey: string;
   outputResourceId: ResourceId;
@@ -123,6 +149,10 @@ export interface StarterExtractorDefinition extends BuildingTypeDefinition {
   baseMaintenancePerHour: number;
   baseEnergyUsePerMinute: number;
   allowedRegionIds: readonly RegionId[];
+}
+
+export interface StarterProcessingInstallationDefinition extends BuildingTypeDefinition {
+  descriptionKey: string;
 }
 
 export interface Building {
@@ -139,6 +169,11 @@ export interface InventoryEntry {
   quantity: number;
 }
 
+export interface LocationInventoryEntry {
+  resourceId: ResourceId;
+  quantity: number;
+}
+
 export interface DashboardExtractorSummary {
   buildingId: string;
   buildingTypeId: string;
@@ -150,13 +185,28 @@ export interface DashboardExtractorSummary {
   nextClaimAt: string;
 }
 
+export interface DashboardProcessingInstallationSummary {
+  buildingId: string;
+  buildingTypeId: string;
+  level: number;
+}
+
 export interface DashboardSnapshot {
   player: PlayerProfile | null;
   inventory: InventoryEntry[];
   extractor: DashboardExtractorSummary | null;
+  processingInstallation: DashboardProcessingInstallationSummary | null;
   transformRecipes: DashboardTransformRecipeSummary[];
+  logisticsLocations: DashboardLogisticsLocationSummary[];
   ledger: LedgerFeedEntry[];
   news: NewsFeedItem[];
+}
+
+export interface DashboardLogisticsLocationSummary {
+  locationId: string;
+  key: PlayerLocationKey;
+  nameKey: string;
+  inventory: LocationInventoryEntry[];
 }
 
 export interface DashboardTransformJobSummary {
@@ -186,21 +236,59 @@ export interface MarketInventoryItem {
   resourceId: ResourceId;
   quantity: number;
   basePrice: number;
+  effectivePrice: number;
   grossValue: number;
   feeAmount: number;
   netValue: number;
+  marketContextKey: MarketContextKey;
+  locationId: string;
+  locationNameKey: string;
+}
+
+export type MarketContextKey = 'region_anchor' | 'trade_hub';
+
+export interface MarketContextSummary {
+  key: MarketContextKey;
+  labelKey: string;
+  descriptionKey: string;
+  locationId: string;
+  locationNameKey: string;
+  focusResourceId: ResourceId;
+}
+
+export interface MarketContextPrice {
+  contextKey: MarketContextKey;
+  price: number;
+  modifierPercent: number;
 }
 
 export interface MarketOfferItem {
   resourceId: ResourceId;
   basePrice: number;
+  contextPrices: MarketContextPrice[];
+}
+
+export type MarketOrderSide = 'buy' | 'sell';
+export type MarketOrderStatus = 'open' | 'filled' | 'cancelled';
+
+export interface MarketOrderItem {
+  id: string;
+  resourceId: ResourceId;
+  side: MarketOrderSide;
+  pricePerUnit: number;
+  quantity: number;
+  remainingQuantity: number;
+  status: MarketOrderStatus;
+  createdAt: string;
 }
 
 export interface MarketSnapshot {
   player: PlayerProfile | null;
   marketFeeRate: number;
+  contexts: MarketContextSummary[];
   offers: MarketOfferItem[];
   inventory: MarketInventoryItem[];
+  orders: MarketOrderItem[];
 }
 
 export interface MarketSellResult {
@@ -213,6 +301,8 @@ export interface MarketSellResult {
   feeAmount: number;
   netAmount: number;
   orderId: string;
+  marketContextKey: MarketContextKey;
+  locationId: string;
 }
 
 export interface MarketBuyResult {
@@ -223,6 +313,23 @@ export interface MarketBuyResult {
   pricePerUnit: number;
   totalCost: number;
   orderId: string;
+  marketContextKey: MarketContextKey;
+  locationId: string;
+}
+
+export interface MarketLimitOrderResult {
+  orderId: string;
+  resourceId: ResourceId;
+  side: MarketOrderSide;
+  pricePerUnit: number;
+  quantity: number;
+  remainingQuantity: number;
+  status: MarketOrderStatus;
+  playerCredits: number;
+  inventoryQuantity: number;
+  matchedOrderId?: string;
+  tradeId?: string;
+  createdAt: string;
 }
 
 export interface TransformStartResult {
@@ -244,6 +351,31 @@ export interface TransformClaimResult {
   outputAmount: number;
   inventoryQuantity: number;
   claimedAt: string;
+}
+
+export interface ProductionJobResult {
+  jobId: string;
+  buildingId: string;
+  recipeKey: string;
+  runs: number;
+  inputResourceId: ResourceId;
+  inputAmount: number;
+  inputInventoryQuantity: number;
+  outputResourceId: ResourceId;
+  outputAmount: number;
+  outputInventoryQuantity: number;
+  completedAt: string;
+}
+
+export interface LogisticsTransferResult {
+  transferId: string;
+  fromLocationId: string;
+  toLocationId: string;
+  resourceId: ResourceId;
+  quantity: number;
+  fromInventoryQuantity: number;
+  toInventoryQuantity: number;
+  createdAt: string;
 }
 
 export interface WorldEvent {

@@ -1,5 +1,7 @@
 # Industrial Dominion — Ultimate Final Pack
 
+> Archived. Use /docs/AI_ENTRYPOINT.md and /docs/ARCHITECTURE.md for current guidance.
+
 This is the current source of truth for the project.
 
 ## Final stack

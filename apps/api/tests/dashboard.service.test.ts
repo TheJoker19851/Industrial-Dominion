@@ -26,15 +26,21 @@ function createAppMock(options?: {
   } | null;
   inventoryRows?: Array<{
     player_id: string;
+    location_id: string;
     resource_id: 'iron_ore' | 'coal' | 'wood' | 'crude_oil' | 'sand' | 'water' | 'crops';
     quantity: number;
   }>;
-  building?: {
+  locationRows?: Array<{
+    id: string;
+    key: 'primary_storage' | 'remote_storage';
+    name_key: string;
+  }>;
+  buildings?: Array<{
     id: string;
     building_type_id: string;
     level: number;
     created_at: string;
-  } | null;
+  }>;
   latestJob?: {
     completes_at: string;
   } | null;
@@ -91,19 +97,34 @@ function createAppMock(options?: {
   const inventoryRows = options?.inventoryRows ?? [
     {
       player_id: 'player-123',
+      location_id: 'location-primary',
       resource_id: 'iron_ore' as const,
       quantity: 48,
     },
   ];
-  const building =
-    options && 'building' in options
-      ? options.building
-      : {
-          id: 'building-123',
-          building_type_id: 'ironridge_iron_extractor',
-          level: 1,
-          created_at: '2026-03-15T10:00:00.000Z',
-        };
+  const locationRows = options?.locationRows ?? [
+    {
+      id: 'location-primary',
+      key: 'primary_storage' as const,
+      name_key: 'locations.primary_storage.name',
+    },
+    {
+      id: 'location-remote',
+      key: 'remote_storage' as const,
+      name_key: 'locations.remote_storage.name',
+    },
+  ];
+  const buildings =
+    options && 'buildings' in options
+      ? options.buildings ?? []
+      : [
+          {
+            id: 'building-123',
+            building_type_id: 'ironridge_iron_extractor',
+            level: 1,
+            created_at: '2026-03-15T10:00:00.000Z',
+          },
+        ];
   const latestJob =
     options && 'latestJob' in options ? options.latestJob : null;
   const transformJobRows = options?.transformJobRows ?? [];
@@ -160,7 +181,17 @@ function createAppMock(options?: {
                 }
 
                 return {
-                  eq: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockImplementation(() => ({
+                    eq: vi.fn().mockReturnValue({
+                      gt: vi.fn().mockReturnValue({
+                        order: vi.fn().mockReturnValue({
+                          returns: vi.fn().mockResolvedValue({
+                            data: inventoryRows,
+                            error: null,
+                          }),
+                        }),
+                      }),
+                    }),
                     gt: vi.fn().mockReturnValue({
                       order: vi.fn().mockReturnValue({
                         returns: vi.fn().mockResolvedValue({
@@ -169,8 +200,23 @@ function createAppMock(options?: {
                         }),
                       }),
                     }),
-                  }),
+                  })),
                 };
+              }),
+            };
+          }
+
+          if (table === 'player_locations') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockReturnValue({
+                    returns: vi.fn().mockResolvedValue({
+                      data: locationRows,
+                      error: null,
+                    }),
+                  }),
+                }),
               }),
             };
           }
@@ -180,11 +226,9 @@ function createAppMock(options?: {
               select: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
                   order: vi.fn().mockReturnValue({
-                    limit: vi.fn().mockReturnValue({
-                      maybeSingle: vi.fn().mockResolvedValue({
-                        data: building,
+                    returns: vi.fn().mockResolvedValue({
+                        data: buildings,
                         error: null,
-                      }),
                     }),
                   }),
                 }),
@@ -277,6 +321,7 @@ describe('dashboard service', () => {
         readyToClaim: true,
         nextClaimAt: '2026-03-15T13:00:00.000Z',
       },
+      processingInstallation: null,
       transformRecipes: [
         {
           recipeId: 'ironridge_iron_ingot_batch',
@@ -288,9 +333,28 @@ describe('dashboard service', () => {
           outputResourceId: 'iron_ingot',
           outputAmount: 6,
           durationSeconds: 3600,
-          canStart: true,
+          canStart: false,
           missingInputAmount: 0,
           activeJob: null,
+        },
+      ],
+      logisticsLocations: [
+        {
+          locationId: 'location-primary',
+          key: 'primary_storage',
+          nameKey: 'locations.primary_storage.name',
+          inventory: [
+            {
+              resourceId: 'iron_ore',
+              quantity: 48,
+            },
+          ],
+        },
+        {
+          locationId: 'location-remote',
+          key: 'remote_storage',
+          nameKey: 'locations.remote_storage.name',
+          inventory: [],
         },
       ],
       ledger: [
@@ -321,7 +385,7 @@ describe('dashboard service', () => {
     const { app } = createAppMock({
       player: null,
       inventoryRows: [],
-      building: null,
+      buildings: [],
       ledgerRows: [],
     });
 
@@ -334,7 +398,9 @@ describe('dashboard service', () => {
       player: null,
       inventory: [],
       extractor: null,
+      processingInstallation: null,
       transformRecipes: [],
+      logisticsLocations: [],
       ledger: [],
       news: [
         {
@@ -379,6 +445,139 @@ describe('dashboard service', () => {
           readyToClaim: true,
         },
       }),
+    ]);
+    expect(result.processingInstallation).toBeNull();
+    expect(result.logisticsLocations).toEqual([
+      {
+        locationId: 'location-primary',
+        key: 'primary_storage',
+        nameKey: 'locations.primary_storage.name',
+        inventory: [
+          {
+            resourceId: 'iron_ore',
+            quantity: 48,
+          },
+        ],
+      },
+      {
+        locationId: 'location-remote',
+        key: 'remote_storage',
+        nameKey: 'locations.remote_storage.name',
+        inventory: [],
+      },
+    ]);
+  });
+
+  it('returns starter processing installation state when placed', async () => {
+    const { app } = createAppMock({
+      buildings: [
+        {
+          id: 'building-123',
+          building_type_id: 'ironridge_iron_extractor',
+          level: 1,
+          created_at: '2026-03-15T10:00:00.000Z',
+        },
+        {
+          id: 'building-processor-1',
+          building_type_id: 'starter_processing_installation',
+          level: 1,
+          created_at: '2026-03-15T10:05:00.000Z',
+        },
+      ],
+    });
+
+    const result = await getDashboardSnapshot(app, {
+      playerId: 'player-123',
+      now: new Date('2026-03-15T12:45:00.000Z'),
+    });
+
+    expect(result.processingInstallation).toEqual({
+      buildingId: 'building-processor-1',
+      buildingTypeId: 'starter_processing_installation',
+      level: 1,
+    });
+    expect(result.transformRecipes).toEqual([
+      expect.objectContaining({
+        recipeId: 'ironridge_iron_ingot_batch',
+        canStart: true,
+      }),
+    ]);
+  });
+
+  it('preserves processing and building ledger outcome metadata in dashboard activity', async () => {
+    const { app } = createAppMock({
+      ledgerRows: [
+        {
+          id: 'ledger-build-1',
+          action_type: 'build',
+          amount: 0,
+          resource_id: null,
+          created_at: '2026-03-15T10:05:00.000Z',
+          metadata: {
+            buildingTypeId: 'starter_processing_installation',
+            starterProcessingPlacement: true,
+          },
+        },
+        {
+          id: 'ledger-transform-start-1',
+          action_type: 'production_transform_started',
+          amount: 0,
+          resource_id: 'iron_ore',
+          created_at: '2026-03-15T12:10:00.000Z',
+          metadata: {
+            recipeId: 'ironridge_iron_ingot_batch',
+          },
+        },
+        {
+          id: 'ledger-production-complete-1',
+          action_type: 'production_completed',
+          amount: 6,
+          resource_id: 'iron_ingot',
+          created_at: '2026-03-15T13:10:00.000Z',
+          metadata: {
+            recipeId: 'ironridge_iron_ingot_batch',
+          },
+        },
+      ],
+    });
+
+    const result = await getDashboardSnapshot(app, {
+      playerId: 'player-123',
+      now: new Date('2026-03-15T13:45:00.000Z'),
+    });
+
+    expect(result.ledger).toEqual([
+      {
+        id: 'ledger-build-1',
+        actionType: 'build',
+        amount: 0,
+        resourceId: undefined,
+        createdAt: '2026-03-15T10:05:00.000Z',
+        metadata: {
+          buildingTypeId: 'starter_processing_installation',
+          starterProcessingPlacement: true,
+        },
+      },
+      {
+        id: 'ledger-transform-start-1',
+        actionType: 'production_transform_started',
+        amount: 0,
+        resourceId: 'iron_ore',
+        createdAt: '2026-03-15T12:10:00.000Z',
+        metadata: {
+          recipeId: 'ironridge_iron_ingot_batch',
+        },
+      },
+      {
+        id: 'ledger-production-complete-1',
+        actionType: 'production_completed',
+        amount: 6,
+        resourceId: 'iron_ingot',
+        createdAt: '2026-03-15T13:10:00.000Z',
+        metadata: {
+          recipeId: 'ironridge_iron_ingot_batch',
+        },
+      },
     ]);
   });
 });

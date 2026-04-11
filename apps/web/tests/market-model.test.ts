@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { clampBuyQuantity, clampSellQuantity } from '../src/features/market/market-model';
+import {
+  clampBuyQuantity,
+  clampOrderPrice,
+  clampSellQuantity,
+} from '../src/features/market/market-model';
 
 describe('market model helpers', () => {
   it('clamps invalid quantities to the minimum sellable value', () => {
@@ -19,5 +23,11 @@ describe('market model helpers', () => {
     expect(clampBuyQuantity(0)).toBe(1);
     expect(clampBuyQuantity(Number.NaN)).toBe(1);
     expect(clampBuyQuantity(4.8)).toBe(4);
+  });
+
+  it('clamps invalid order prices to the minimum valid price', () => {
+    expect(clampOrderPrice(0)).toBe(1);
+    expect(clampOrderPrice(Number.NaN)).toBe(1);
+    expect(clampOrderPrice(19.8)).toBe(19);
   });
 });

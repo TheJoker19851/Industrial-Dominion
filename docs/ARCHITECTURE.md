@@ -2,6 +2,15 @@
 
 ## Final architecture
 
+### Stack summary
+
+- Frontend: React + Vite + TypeScript + Tailwind (Vercel)
+- Backend: Fastify + TypeScript (Railway)
+- Platform: Supabase (Postgres, Auth, Realtime, Storage)
+- Payments: Stripe
+- Localization: react-i18next (EN/FR)
+- Device support: responsive web, mobile-playable core loop
+
 Frontend
 
 - React

@@ -2,6 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { gameConfig } from '@industrial-dominion/config';
 import type {
   MarketBuyResult,
+  MarketContextKey,
+  MarketContextSummary,
+  MarketContextPrice,
+  MarketLimitOrderResult,
+  MarketOrderItem,
   MarketOfferItem,
   MarketSellResult,
   MarketSnapshot,
@@ -11,6 +16,8 @@ import type {
   ResourceId,
   SupportedLocale,
 } from '@industrial-dominion/shared';
+import { readPlayerLocations } from '../../db/player-locations.js';
+import { buildMarketContexts, getMarketContextPrice } from './market-context.js';
 
 type PlayerRow = {
   id: string;
@@ -21,6 +28,7 @@ type PlayerRow = {
 
 type InventoryRow = {
   player_id: string;
+  location_id: string;
   resource_id: ResourceId;
   quantity: number;
   resources: {
@@ -29,10 +37,27 @@ type InventoryRow = {
   } | null;
 };
 
+type PlayerLocationRow = {
+  id: string;
+  key: 'primary_storage' | 'remote_storage';
+  name_key: string;
+};
+
 type OfferRow = {
   id: ResourceId;
   base_price: number;
   tradable: boolean;
+};
+
+type MarketOrderRow = {
+  id: string;
+  resource_id: ResourceId;
+  side: 'buy' | 'sell';
+  price_per_unit: number;
+  quantity: number;
+  remaining_quantity: number;
+  status: 'open' | 'filled' | 'cancelled';
+  created_at: string;
 };
 
 type BuyRpcResult = {
@@ -41,6 +66,8 @@ type BuyRpcResult = {
   total_cost: number;
   inventory_quantity: number;
   player_credits: number;
+  location_id: string;
+  market_context_key: MarketContextKey;
 };
 
 type SellRpcResult = {
@@ -51,7 +78,39 @@ type SellRpcResult = {
   net_amount: number;
   inventory_quantity: number;
   player_credits: number;
+  location_id: string;
+  market_context_key: MarketContextKey;
 };
+
+type LimitOrderRpcResult = {
+  order_id: string;
+  resource_id: ResourceId;
+  side: 'buy' | 'sell';
+  price_per_unit: number;
+  quantity: number;
+  remaining_quantity: number;
+  status: 'open' | 'filled' | 'cancelled';
+  player_credits: number;
+  inventory_quantity: number;
+  matched_order_id: string | null;
+  trade_id: string | null;
+  created_at: string;
+};
+
+const instantTradeSpreadRate = 0.05;
+
+function applyInstantTradeSpread(price: number, side: 'buy' | 'sell') {
+  const adjustedPrice =
+    side === 'buy'
+      ? Math.round(price * (1 + instantTradeSpreadRate))
+      : Math.round(price * (1 - instantTradeSpreadRate));
+
+  return Math.max(1, adjustedPrice);
+}
+
+function toModifierPercent(price: number, basePrice: number) {
+  return Number(((price - basePrice) / Math.max(basePrice, 1)).toFixed(2));
+}
 
 function mapPlayer(player: PlayerRow | null): PlayerProfile | null {
   if (!player) {
@@ -66,23 +125,69 @@ function mapPlayer(player: PlayerRow | null): PlayerProfile | null {
   };
 }
 
-function mapOfferItem(entry: OfferRow): MarketOfferItem | null {
+function mapOfferItem(input: {
+  entry: OfferRow;
+  playerRegionId: RegionId | undefined;
+  contexts: MarketContextSummary[];
+}): MarketOfferItem | null {
+  const { entry, playerRegionId, contexts } = input;
+
   if (!entry.tradable) {
     return null;
   }
 
+  const contextPrices = contexts.map<MarketContextPrice>((context) =>
+    {
+      const contextQuote = getMarketContextPrice({
+        contextKey: context.key,
+        regionId: playerRegionId,
+        resourceId: entry.id,
+        basePrice: entry.base_price,
+        side: 'buy',
+      });
+      const spreadAdjustedPrice = applyInstantTradeSpread(contextQuote.price, 'buy');
+
+      return {
+        contextKey: contextQuote.contextKey,
+        price: spreadAdjustedPrice,
+        modifierPercent: toModifierPercent(spreadAdjustedPrice, entry.base_price),
+      };
+    },
+  );
+
   return {
     resourceId: entry.id,
     basePrice: entry.base_price,
+    contextPrices,
   };
 }
 
-function mapInventoryItem(entry: InventoryRow): MarketInventoryItem | null {
+function mapInventoryItem(input: {
+  entry: InventoryRow;
+  playerRegionId: RegionId | undefined;
+  contexts: MarketContextSummary[];
+}): MarketInventoryItem | null {
+  const { entry, playerRegionId, contexts } = input;
+
   if (!entry.resources?.tradable) {
     return null;
   }
 
-  const grossValue = entry.resources.base_price * entry.quantity;
+  const context = contexts.find((item) => item.locationId === entry.location_id);
+
+  if (!context) {
+    return null;
+  }
+
+  const contextPrice = getMarketContextPrice({
+    contextKey: context.key,
+    regionId: playerRegionId,
+    resourceId: entry.resource_id,
+    basePrice: entry.resources.base_price,
+    side: 'sell',
+  }).price;
+  const effectivePrice = applyInstantTradeSpread(contextPrice, 'sell');
+  const grossValue = effectivePrice * entry.quantity;
   const feeAmount = Math.round(grossValue * gameConfig.marketFee);
   const netValue = grossValue - feeAmount;
 
@@ -90,16 +195,17 @@ function mapInventoryItem(entry: InventoryRow): MarketInventoryItem | null {
     resourceId: entry.resource_id,
     quantity: entry.quantity,
     basePrice: entry.resources.base_price,
+    effectivePrice,
     grossValue,
     feeAmount,
     netValue,
+    marketContextKey: context.key,
+    locationId: context.locationId,
+    locationNameKey: context.locationNameKey,
   };
 }
 
-export async function getMarketSnapshot(
-  app: FastifyInstance,
-  playerId: string,
-): Promise<MarketSnapshot> {
+async function readPlayerMarketContextState(app: FastifyInstance, playerId: string) {
   const supabase = app.getSupabaseAdminClient();
   const { data: player, error: playerError } = await supabase
     .from('players')
@@ -111,10 +217,42 @@ export async function getMarketSnapshot(
     throw new Error(`Failed to load market player state: ${playerError.message}`);
   }
 
+  const locationRows = (player ? await readPlayerLocations(app, playerId) : []) as PlayerLocationRow[];
+  const contexts = buildMarketContexts({
+    regionId: player?.region_id ?? undefined,
+    locations: locationRows.map((entry) => ({
+      id: entry.id,
+      key: entry.key,
+      nameKey: entry.name_key,
+    })),
+  });
+
+  return {
+    player,
+    contexts,
+  };
+}
+
+function resolveMarketContext(
+  contexts: MarketContextSummary[],
+  marketContextKey: MarketContextKey,
+) {
+  return contexts.find((context) => context.key === marketContextKey) ?? contexts[0] ?? null;
+}
+
+export async function getMarketSnapshot(
+  app: FastifyInstance,
+  playerId: string,
+): Promise<MarketSnapshot> {
+  const supabase = app.getSupabaseAdminClient();
+  const { player, contexts } = await readPlayerMarketContextState(app, playerId);
+  const locationIds = contexts.map((entry) => entry.locationId);
+
   const { data: inventoryRows, error: inventoryError } = await supabase
     .from('inventories')
-    .select('player_id, resource_id, quantity, resources(base_price, tradable)')
+    .select('player_id, location_id, resource_id, quantity, resources(base_price, tradable)')
     .eq('player_id', playerId)
+    .in('location_id', locationIds)
     .gt('quantity', 0)
     .order('quantity', { ascending: false })
     .returns<InventoryRow[]>();
@@ -134,15 +272,50 @@ export async function getMarketSnapshot(
     throw new Error(`Failed to load market offers: ${offerError.message}`);
   }
 
+  const { data: orderRows, error: orderError } = await supabase
+    .from('market_orders')
+    .select('id, resource_id, side, price_per_unit, quantity, remaining_quantity, status, created_at')
+    .eq('player_id', playerId)
+    .order('created_at', { ascending: false })
+    .limit(8)
+    .returns<MarketOrderRow[]>();
+
+  if (orderError) {
+    throw new Error(`Failed to load market orders: ${orderError.message}`);
+  }
+
   return {
     player: mapPlayer(player),
+    contexts,
     marketFeeRate: gameConfig.marketFee,
     offers: (offerRows ?? [])
-      .map(mapOfferItem)
+      .map((entry) =>
+        mapOfferItem({
+          entry,
+          playerRegionId: player?.region_id ?? undefined,
+          contexts,
+        }),
+      )
       .filter((entry): entry is MarketOfferItem => entry !== null),
     inventory: (inventoryRows ?? [])
-      .map(mapInventoryItem)
+      .map((entry) =>
+        mapInventoryItem({
+          entry,
+          playerRegionId: player?.region_id ?? undefined,
+          contexts,
+        }),
+      )
       .filter((entry): entry is MarketInventoryItem => entry !== null),
+    orders: (orderRows ?? []).map<MarketOrderItem>((entry) => ({
+      id: entry.id,
+      resourceId: entry.resource_id,
+      side: entry.side,
+      pricePerUnit: entry.price_per_unit,
+      quantity: entry.quantity,
+      remainingQuantity: entry.remaining_quantity,
+      status: entry.status,
+      createdAt: entry.created_at,
+    })),
   };
 }
 
@@ -152,12 +325,46 @@ export async function buyResource(
     playerId: string;
     resourceId: ResourceId;
     quantity: number;
+    marketContextKey: MarketContextKey;
   },
 ): Promise<MarketBuyResult> {
-  const { data, error } = await app.getSupabaseAdminClient().rpc('buy_market_resource', {
+  const { player, contexts } = await readPlayerMarketContextState(app, input.playerId);
+  const marketContext = resolveMarketContext(contexts, input.marketContextKey);
+  const { data: resourceRow, error: resourceError } = await app
+    .getSupabaseAdminClient()
+    .from('resources')
+    .select('id, base_price, tradable')
+    .eq('id', input.resourceId)
+    .maybeSingle<OfferRow>();
+
+  if (resourceError) {
+    throw new Error(`Failed to load market resource: ${resourceError.message}`);
+  }
+
+  if (!resourceRow) {
+    throw new Error('Resource not found.');
+  }
+
+  if (!marketContext) {
+    throw new Error('Market context is invalid.');
+  }
+
+  const marketContextPrice = getMarketContextPrice({
+    contextKey: marketContext.key,
+    regionId: player?.region_id ?? undefined,
+    resourceId: input.resourceId,
+    basePrice: resourceRow.base_price,
+    side: 'buy',
+  }).price;
+  const price = applyInstantTradeSpread(marketContextPrice, 'buy');
+
+  const { data, error } = await app.getSupabaseAdminClient().rpc('buy_market_resource_at_location', {
     p_player_id: input.playerId,
+    p_location_id: marketContext.locationId,
+    p_market_context_key: marketContext.key,
     p_resource_id: input.resourceId,
     p_quantity: input.quantity,
+    p_price_per_unit: price,
   });
 
   if (error) {
@@ -178,6 +385,8 @@ export async function buyResource(
     pricePerUnit: result.price_per_unit,
     totalCost: result.total_cost,
     orderId: result.order_id,
+    marketContextKey: result.market_context_key,
+    locationId: result.location_id,
   };
 }
 
@@ -187,12 +396,46 @@ export async function sellResource(
     playerId: string;
     resourceId: ResourceId;
     quantity: number;
+    marketContextKey: MarketContextKey;
   },
 ): Promise<MarketSellResult> {
-  const { data, error } = await app.getSupabaseAdminClient().rpc('sell_inventory_resource', {
+  const { player, contexts } = await readPlayerMarketContextState(app, input.playerId);
+  const marketContext = resolveMarketContext(contexts, input.marketContextKey);
+  const { data: resourceRow, error: resourceError } = await app
+    .getSupabaseAdminClient()
+    .from('resources')
+    .select('id, base_price, tradable')
+    .eq('id', input.resourceId)
+    .maybeSingle<OfferRow>();
+
+  if (resourceError) {
+    throw new Error(`Failed to load market resource: ${resourceError.message}`);
+  }
+
+  if (!resourceRow) {
+    throw new Error('Resource not found.');
+  }
+
+  if (!marketContext) {
+    throw new Error('Market context is invalid.');
+  }
+
+  const marketContextPrice = getMarketContextPrice({
+    contextKey: marketContext.key,
+    regionId: player?.region_id ?? undefined,
+    resourceId: input.resourceId,
+    basePrice: resourceRow.base_price,
+    side: 'sell',
+  }).price;
+  const price = applyInstantTradeSpread(marketContextPrice, 'sell');
+
+  const { data, error } = await app.getSupabaseAdminClient().rpc('sell_inventory_resource_at_location', {
     p_player_id: input.playerId,
+    p_location_id: marketContext.locationId,
+    p_market_context_key: marketContext.key,
     p_resource_id: input.resourceId,
     p_quantity: input.quantity,
+    p_price_per_unit: price,
     p_fee_rate: gameConfig.marketFee,
   });
 
@@ -216,5 +459,52 @@ export async function sellResource(
     feeAmount: result.fee_amount,
     netAmount: result.net_amount,
     orderId: result.order_id,
+    marketContextKey: result.market_context_key,
+    locationId: result.location_id,
+  };
+}
+
+export async function createMarketOrder(
+  app: FastifyInstance,
+  input: {
+    playerId: string;
+    resourceId: ResourceId;
+    side: 'buy' | 'sell';
+    price: number;
+    quantity: number;
+  },
+): Promise<MarketLimitOrderResult> {
+  const { data, error } = await app.getSupabaseAdminClient().rpc('create_market_limit_order', {
+    p_player_id: input.playerId,
+    p_resource_id: input.resourceId,
+    p_side: input.side,
+    p_price_per_unit: input.price,
+    p_quantity: input.quantity,
+    p_fee_rate: gameConfig.marketFee,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const result = (data?.[0] ?? null) as LimitOrderRpcResult | null;
+
+  if (!result) {
+    throw new Error('Market order did not return a result.');
+  }
+
+  return {
+    orderId: result.order_id,
+    resourceId: result.resource_id,
+    side: result.side,
+    pricePerUnit: result.price_per_unit,
+    quantity: result.quantity,
+    remainingQuantity: result.remaining_quantity,
+    status: result.status,
+    playerCredits: result.player_credits,
+    inventoryQuantity: result.inventory_quantity,
+    matchedOrderId: result.matched_order_id ?? undefined,
+    tradeId: result.trade_id ?? undefined,
+    createdAt: result.created_at,
   };
 }
