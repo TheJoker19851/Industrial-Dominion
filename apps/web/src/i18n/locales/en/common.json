@@ -522,6 +522,9 @@
     "wood": {
       "name": "Wood"
     },
+    "plank": {
+      "name": "Plank"
+    },
     "crude_oil": {
       "name": "Crude oil"
     },
@@ -641,12 +644,20 @@
     "ironridge_iron_ingot_batch": {
       "name": "Iron ingot batch",
       "description": "Refine a starter batch of iron ore into a smaller volume of industrial iron ingots."
+    },
+    "greenhaven_plank_batch": {
+      "name": "Plank batch",
+      "description": "Saw a starter batch of wood into construction-ready planks."
     }
   },
   "productionRecipes": {
     "iron_ingot_from_iron_ore": {
       "name": "Iron ingot run",
       "description": "Convert a small batch of iron ore into iron ingots using the simplest possible starter production flow."
+    },
+    "plank_from_wood": {
+      "name": "Plank run",
+      "description": "Convert a small batch of wood into planks using the simplest possible starter production flow."
     }
   },
   "gameplayErrors": {

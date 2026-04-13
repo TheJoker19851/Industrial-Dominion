@@ -5,9 +5,11 @@ import type {
   MarketContextKey,
   MarketContextSummary,
   MarketContextPrice,
+  MarketQuoteComparison,
   MarketLimitOrderResult,
   MarketOrderItem,
   MarketOfferItem,
+  MarketTopOfBook,
   MarketSellResult,
   MarketSnapshot,
   MarketInventoryItem,
@@ -58,6 +60,14 @@ type MarketOrderRow = {
   remaining_quantity: number;
   status: 'open' | 'filled' | 'cancelled';
   created_at: string;
+};
+
+type MarketOrderBookRow = {
+  resource_id: ResourceId;
+  side: 'buy' | 'sell';
+  price_per_unit: number;
+  remaining_quantity: number;
+  status: 'open' | 'filled' | 'cancelled';
 };
 
 type BuyRpcResult = {
@@ -112,6 +122,51 @@ function toModifierPercent(price: number, basePrice: number) {
   return Number(((price - basePrice) / Math.max(basePrice, 1)).toFixed(2));
 }
 
+function buildQuoteComparison(input: {
+  quotePrice: number;
+  referencePrice: number | null;
+  side: 'buy' | 'sell';
+}): MarketQuoteComparison {
+  const { quotePrice, referencePrice, side } = input;
+
+  if (referencePrice === null) {
+    return {
+      referencePrice: null,
+      deltaAbsolute: null,
+      deltaPercent: null,
+      relation: 'unavailable',
+    };
+  }
+
+  const deltaAbsolute = Math.abs(quotePrice - referencePrice);
+  const deltaPercent = Number((deltaAbsolute / Math.max(referencePrice, 1)).toFixed(2));
+
+  if (quotePrice === referencePrice) {
+    return {
+      referencePrice,
+      deltaAbsolute,
+      deltaPercent,
+      relation: 'equal',
+    };
+  }
+
+  const relation =
+    side === 'buy'
+      ? quotePrice < referencePrice
+        ? 'better'
+        : 'worse'
+      : quotePrice > referencePrice
+        ? 'better'
+        : 'worse';
+
+  return {
+    referencePrice,
+    deltaAbsolute,
+    deltaPercent,
+    relation,
+  };
+}
+
 function mapPlayer(player: PlayerRow | null): PlayerProfile | null {
   if (!player) {
     return null;
@@ -129,8 +184,9 @@ function mapOfferItem(input: {
   entry: OfferRow;
   playerRegionId: RegionId | undefined;
   contexts: MarketContextSummary[];
+  topOfBook: MarketTopOfBook;
 }): MarketOfferItem | null {
-  const { entry, playerRegionId, contexts } = input;
+  const { entry, playerRegionId, contexts, topOfBook } = input;
 
   if (!entry.tradable) {
     return null;
@@ -151,6 +207,11 @@ function mapOfferItem(input: {
         contextKey: contextQuote.contextKey,
         price: spreadAdjustedPrice,
         modifierPercent: toModifierPercent(spreadAdjustedPrice, entry.base_price),
+        bookComparison: buildQuoteComparison({
+          quotePrice: spreadAdjustedPrice,
+          referencePrice: topOfBook.bestAsk,
+          side: 'buy',
+        }),
       };
     },
   );
@@ -159,15 +220,53 @@ function mapOfferItem(input: {
     resourceId: entry.id,
     basePrice: entry.base_price,
     contextPrices,
+    topOfBook,
   };
+}
+
+function buildTopOfBookByResource(input: {
+  offerRows: OfferRow[];
+  openOrderRows: MarketOrderBookRow[];
+}) {
+  const topOfBookByResource = new Map<ResourceId, MarketTopOfBook>();
+
+  for (const offerRow of input.offerRows) {
+    topOfBookByResource.set(offerRow.id, {
+      bestBid: null,
+      bestAsk: null,
+    });
+  }
+
+  for (const orderRow of input.openOrderRows) {
+    const topOfBook = topOfBookByResource.get(orderRow.resource_id);
+
+    if (!topOfBook) {
+      continue;
+    }
+
+    if (orderRow.side === 'buy') {
+      if (topOfBook.bestBid === null || orderRow.price_per_unit > topOfBook.bestBid) {
+        topOfBook.bestBid = orderRow.price_per_unit;
+      }
+
+      continue;
+    }
+
+    if (topOfBook.bestAsk === null || orderRow.price_per_unit < topOfBook.bestAsk) {
+      topOfBook.bestAsk = orderRow.price_per_unit;
+    }
+  }
+
+  return topOfBookByResource;
 }
 
 function mapInventoryItem(input: {
   entry: InventoryRow;
   playerRegionId: RegionId | undefined;
   contexts: MarketContextSummary[];
+  topOfBookByResource: Map<ResourceId, MarketTopOfBook>;
 }): MarketInventoryItem | null {
-  const { entry, playerRegionId, contexts } = input;
+  const { entry, playerRegionId, contexts, topOfBookByResource } = input;
 
   if (!entry.resources?.tradable) {
     return null;
@@ -202,6 +301,11 @@ function mapInventoryItem(input: {
     marketContextKey: context.key,
     locationId: context.locationId,
     locationNameKey: context.locationNameKey,
+    bookComparison: buildQuoteComparison({
+      quotePrice: effectivePrice,
+      referencePrice: topOfBookByResource.get(entry.resource_id)?.bestBid ?? null,
+      side: 'sell',
+    }),
   };
 }
 
@@ -272,6 +376,22 @@ export async function getMarketSnapshot(
     throw new Error(`Failed to load market offers: ${offerError.message}`);
   }
 
+  const { data: openOrderRows, error: openOrderError } = await supabase
+    .from('market_orders')
+    .select('resource_id, side, price_per_unit, remaining_quantity, status')
+    .eq('status', 'open')
+    .gt('remaining_quantity', 0)
+    .returns<MarketOrderBookRow[]>();
+
+  if (openOrderError) {
+    throw new Error(`Failed to load market order book: ${openOrderError.message}`);
+  }
+
+  const topOfBookByResource = buildTopOfBookByResource({
+    offerRows: offerRows ?? [],
+    openOrderRows: openOrderRows ?? [],
+  });
+
   const { data: orderRows, error: orderError } = await supabase
     .from('market_orders')
     .select('id, resource_id, side, price_per_unit, quantity, remaining_quantity, status, created_at')
@@ -294,6 +414,10 @@ export async function getMarketSnapshot(
           entry,
           playerRegionId: player?.region_id ?? undefined,
           contexts,
+          topOfBook: topOfBookByResource.get(entry.id) ?? {
+            bestBid: null,
+            bestAsk: null,
+          },
         }),
       )
       .filter((entry): entry is MarketOfferItem => entry !== null),
@@ -303,6 +427,7 @@ export async function getMarketSnapshot(
           entry,
           playerRegionId: player?.region_id ?? undefined,
           contexts,
+          topOfBookByResource,
         }),
       )
       .filter((entry): entry is MarketInventoryItem => entry !== null),

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PageCard } from '@industrial-dominion/ui';
 import { Link } from 'react-router-dom';
-import type { MarketContextKey } from '@industrial-dominion/shared';
+import type { MarketContextKey, ResourceId } from '@industrial-dominion/shared';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { getGameplayErrorKey } from '@/features/gameplay/gameplay-error';
 import { useFormatters } from '@/i18n/useFormatters';
@@ -25,7 +25,7 @@ export function MarketPage() {
   const [orderSide, setOrderSide] = useState<'buy' | 'sell'>('buy');
   const [selectedMarketContextKey, setSelectedMarketContextKey] =
     useState<MarketContextKey>('region_anchor');
-  const [orderResourceId, setOrderResourceId] = useState<'iron_ore' | 'iron_ingot' | 'coal' | 'wood' | 'crude_oil' | 'sand' | 'water' | 'crops'>('iron_ore');
+  const [orderResourceId, setOrderResourceId] = useState<ResourceId>('iron_ore');
   const [orderPrice, setOrderPrice] = useState(18);
   const [orderQuantity, setOrderQuantity] = useState(1);
   const accessToken = session?.access_token;

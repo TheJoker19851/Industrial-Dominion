@@ -25,6 +25,7 @@ values
   ('iron_ingot', 'resources.iron_ingot.name', 'processed', 2, 42, false, true),
   ('coal', 'resources.coal.name', 'raw', 1, 14, true, true),
   ('wood', 'resources.wood.name', 'raw', 1, 10, true, true),
+  ('plank', 'resources.plank.name', 'processed', 2, 26, true, true),
   ('crude_oil', 'resources.crude_oil.name', 'raw', 1, 22, true, true),
   ('sand', 'resources.sand.name', 'raw', 1, 8, true, true),
   ('water', 'resources.water.name', 'raw', 1, 6, true, true),
@@ -59,7 +60,8 @@ insert into recipes (
   duration_seconds
 )
 values
-  ('ironridge_iron_ingot_batch', 'iron_ore', 'iron_ingot', 12, 6, 3600)
+  ('ironridge_iron_ingot_batch', 'iron_ore', 'iron_ingot', 12, 6, 3600),
+  ('greenhaven_plank_batch', 'wood', 'plank', 12, 6, 1800)
 on conflict (id) do update
 set
   input_resource_id = excluded.input_resource_id,
@@ -77,7 +79,8 @@ insert into recipes (
   duration_seconds
 )
 values
-  ('iron_ingot_from_iron_ore', 'iron_ore', 'iron_ingot', 2, 1, 1)
+  ('iron_ingot_from_iron_ore', 'iron_ore', 'iron_ingot', 2, 1, 1),
+  ('plank_from_wood', 'wood', 'plank', 2, 1, 1)
 on conflict (id) do update set
   input_resource_id = excluded.input_resource_id,
   output_resource_id = excluded.output_resource_id,

@@ -34,6 +34,16 @@ function createAppMock(options?: {
     status: 'open' | 'filled' | 'cancelled';
     created_at: string;
   }>;
+  orderBookRows?: Array<{
+    id: string;
+    resource_id: 'iron_ore' | 'iron_ingot' | 'coal' | 'wood' | 'crude_oil' | 'sand' | 'water' | 'crops';
+    side: 'buy' | 'sell';
+    price_per_unit: number;
+    quantity: number;
+    remaining_quantity: number;
+    status: 'open' | 'filled' | 'cancelled';
+    created_at: string;
+  }>;
   rpcError?: string | null;
   buyRpcError?: string | null;
   orderRpcError?: string | null;
@@ -71,6 +81,7 @@ function createAppMock(options?: {
       created_at: '2026-03-17T18:00:00.000Z',
     },
   ];
+  const orderBookRows = options?.orderBookRows ?? orderRows;
 
   return {
     app: {
@@ -185,17 +196,43 @@ function createAppMock(options?: {
           }
 
           if (table === 'market_orders') {
+            let selectedStatus: 'open' | 'filled' | 'cancelled' | null = null;
+
             return {
               select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  order: vi.fn().mockReturnValue({
-                    limit: vi.fn().mockReturnValue({
-                      returns: vi.fn().mockResolvedValue({
-                        data: orderRows,
-                        error: null,
+                eq: vi.fn((column: string, value: string) => {
+                  if (column === 'player_id') {
+                    return {
+                      order: vi.fn().mockReturnValue({
+                        limit: vi.fn().mockReturnValue({
+                          returns: vi.fn().mockResolvedValue({
+                            data: orderRows,
+                            error: null,
+                          }),
+                        }),
                       }),
-                    }),
-                  }),
+                    };
+                  }
+
+                  if (column === 'status' && (value === 'open' || value === 'filled' || value === 'cancelled')) {
+                    selectedStatus = value;
+
+                    return {
+                      gt: vi.fn().mockImplementation((gtColumn: string, minimumValue: number) => ({
+                        returns: vi.fn().mockResolvedValue({
+                          data: orderBookRows.filter(
+                            (entry) =>
+                              entry.status === selectedStatus &&
+                              (gtColumn !== 'remaining_quantity' ||
+                                entry.remaining_quantity > minimumValue),
+                          ),
+                          error: null,
+                        }),
+                      })),
+                    };
+                  }
+
+                  throw new Error(`Unexpected market_orders filter ${column}`);
                 }),
               }),
             };
@@ -379,17 +416,65 @@ describe('market service', () => {
           resourceId: 'coal',
           basePrice: 12,
           contextPrices: [
-            { contextKey: 'region_anchor', price: 13, modifierPercent: 0.08 },
-            { contextKey: 'trade_hub', price: 13, modifierPercent: 0.08 },
+            {
+              contextKey: 'region_anchor',
+              price: 13,
+              modifierPercent: 0.08,
+              bookComparison: {
+                referencePrice: null,
+                deltaAbsolute: null,
+                deltaPercent: null,
+                relation: 'unavailable',
+              },
+            },
+            {
+              contextKey: 'trade_hub',
+              price: 13,
+              modifierPercent: 0.08,
+              bookComparison: {
+                referencePrice: null,
+                deltaAbsolute: null,
+                deltaPercent: null,
+                relation: 'unavailable',
+              },
+            },
           ],
+          topOfBook: {
+            bestBid: null,
+            bestAsk: null,
+          },
         },
         {
           resourceId: 'iron_ore',
           basePrice: 18,
           contextPrices: [
-            { contextKey: 'region_anchor', price: 16, modifierPercent: -0.11 },
-            { contextKey: 'trade_hub', price: 20, modifierPercent: 0.11 },
+            {
+              contextKey: 'region_anchor',
+              price: 16,
+              modifierPercent: -0.11,
+              bookComparison: {
+                referencePrice: null,
+                deltaAbsolute: null,
+                deltaPercent: null,
+                relation: 'unavailable',
+              },
+            },
+            {
+              contextKey: 'trade_hub',
+              price: 20,
+              modifierPercent: 0.11,
+              bookComparison: {
+                referencePrice: null,
+                deltaAbsolute: null,
+                deltaPercent: null,
+                relation: 'unavailable',
+              },
+            },
           ],
+          topOfBook: {
+            bestBid: 15,
+            bestAsk: null,
+          },
         },
       ],
       inventory: [
@@ -404,6 +489,12 @@ describe('market service', () => {
           marketContextKey: 'region_anchor',
           locationId: 'location-primary',
           locationNameKey: 'locations.primary_storage.name',
+          bookComparison: {
+            referencePrice: 15,
+            deltaAbsolute: 0,
+            deltaPercent: 0,
+            relation: 'equal',
+          },
         },
       ],
       orders: [
@@ -545,12 +636,237 @@ describe('market service', () => {
   it('keeps instant trade quotes valid when no player orders exist', async () => {
     const { app } = createAppMock({
       orderRows: [],
+      orderBookRows: [],
     });
 
     const result = await getMarketSnapshot(app, 'player-123');
 
     expect(result.orders).toEqual([]);
     expect(result.offers[0]?.contextPrices[0]?.price).toBe(13);
+    expect(result.offers[0]?.topOfBook).toEqual({
+      bestBid: null,
+      bestAsk: null,
+    });
+    expect(result.offers[0]?.contextPrices[0]?.bookComparison).toEqual({
+      referencePrice: null,
+      deltaAbsolute: null,
+      deltaPercent: null,
+      relation: 'unavailable',
+    });
+    expect(result.inventory[0]?.bookComparison).toEqual({
+      referencePrice: null,
+      deltaAbsolute: null,
+      deltaPercent: null,
+      relation: 'unavailable',
+    });
     expect(result.inventory[0]?.effectivePrice).toBe(15);
+  });
+
+  it('computes top-of-book from open orders across both sides', async () => {
+    const { app } = createAppMock({
+      orderBookRows: [
+        {
+          id: 'buy-1',
+          resource_id: 'coal',
+          side: 'buy',
+          price_per_unit: 10,
+          quantity: 5,
+          remaining_quantity: 5,
+          status: 'open',
+          created_at: '2026-03-17T18:00:00.000Z',
+        },
+        {
+          id: 'buy-2',
+          resource_id: 'coal',
+          side: 'buy',
+          price_per_unit: 12,
+          quantity: 5,
+          remaining_quantity: 5,
+          status: 'open',
+          created_at: '2026-03-17T19:00:00.000Z',
+        },
+        {
+          id: 'sell-1',
+          resource_id: 'coal',
+          side: 'sell',
+          price_per_unit: 15,
+          quantity: 4,
+          remaining_quantity: 4,
+          status: 'open',
+          created_at: '2026-03-17T18:30:00.000Z',
+        },
+        {
+          id: 'sell-2',
+          resource_id: 'coal',
+          side: 'sell',
+          price_per_unit: 14,
+          quantity: 3,
+          remaining_quantity: 3,
+          status: 'open',
+          created_at: '2026-03-17T19:30:00.000Z',
+        },
+      ],
+    });
+
+    const result = await getMarketSnapshot(app, 'player-123');
+    const coalOffer = result.offers.find((entry) => entry.resourceId === 'coal');
+
+    expect(coalOffer?.topOfBook).toEqual({
+      bestBid: 12,
+      bestAsk: 14,
+    });
+    expect(coalOffer?.contextPrices[0]?.bookComparison).toEqual({
+      referencePrice: 14,
+      deltaAbsolute: 1,
+      deltaPercent: 0.07,
+      relation: 'better',
+    });
+  });
+
+  it('ignores non-open and zero-remaining orders in top-of-book', async () => {
+    const { app } = createAppMock({
+      orderBookRows: [
+        {
+          id: 'buy-filled',
+          resource_id: 'iron_ore',
+          side: 'buy',
+          price_per_unit: 50,
+          quantity: 4,
+          remaining_quantity: 0,
+          status: 'filled',
+          created_at: '2026-03-17T18:00:00.000Z',
+        },
+        {
+          id: 'sell-cancelled',
+          resource_id: 'iron_ore',
+          side: 'sell',
+          price_per_unit: 3,
+          quantity: 4,
+          remaining_quantity: 4,
+          status: 'cancelled',
+          created_at: '2026-03-17T18:30:00.000Z',
+        },
+        {
+          id: 'buy-open-zero-remaining',
+          resource_id: 'iron_ore',
+          side: 'buy',
+          price_per_unit: 22,
+          quantity: 4,
+          remaining_quantity: 0,
+          status: 'open',
+          created_at: '2026-03-17T19:00:00.000Z',
+        },
+      ],
+    });
+
+    const result = await getMarketSnapshot(app, 'player-123');
+    const ironOreOffer = result.offers.find((entry) => entry.resourceId === 'iron_ore');
+
+    expect(ironOreOffer?.topOfBook).toEqual({
+      bestBid: null,
+      bestAsk: null,
+    });
+    expect(ironOreOffer?.contextPrices[0]?.bookComparison?.relation).toBe('unavailable');
+    expect(result.inventory[0]?.bookComparison?.relation).toBe('unavailable');
+  });
+
+  it('returns top-of-book for single-sided books', async () => {
+    const { app } = createAppMock({
+      orderBookRows: [
+        {
+          id: 'sell-open-1',
+          resource_id: 'iron_ore',
+          side: 'sell',
+          price_per_unit: 18,
+          quantity: 2,
+          remaining_quantity: 2,
+          status: 'open',
+          created_at: '2026-03-17T18:00:00.000Z',
+        },
+        {
+          id: 'sell-open-2',
+          resource_id: 'iron_ore',
+          side: 'sell',
+          price_per_unit: 17,
+          quantity: 2,
+          remaining_quantity: 2,
+          status: 'open',
+          created_at: '2026-03-17T18:30:00.000Z',
+        },
+      ],
+    });
+
+    const result = await getMarketSnapshot(app, 'player-123');
+    const ironOreOffer = result.offers.find((entry) => entry.resourceId === 'iron_ore');
+
+    expect(ironOreOffer?.topOfBook).toEqual({
+      bestBid: null,
+      bestAsk: 17,
+    });
+    expect(ironOreOffer?.contextPrices[0]?.bookComparison).toEqual({
+      referencePrice: 17,
+      deltaAbsolute: 1,
+      deltaPercent: 0.06,
+      relation: 'better',
+    });
+    expect(ironOreOffer?.contextPrices[1]?.bookComparison).toEqual({
+      referencePrice: 17,
+      deltaAbsolute: 3,
+      deltaPercent: 0.18,
+      relation: 'worse',
+    });
+  });
+
+  it('marks instant buy as worse when quote is above best ask', async () => {
+    const { app } = createAppMock({
+      orderBookRows: [
+        {
+          id: 'sell-coal-1',
+          resource_id: 'coal',
+          side: 'sell',
+          price_per_unit: 12,
+          quantity: 5,
+          remaining_quantity: 5,
+          status: 'open',
+          created_at: '2026-03-17T18:00:00.000Z',
+        },
+      ],
+    });
+
+    const result = await getMarketSnapshot(app, 'player-123');
+    const coalOffer = result.offers.find((entry) => entry.resourceId === 'coal');
+
+    expect(coalOffer?.contextPrices[0]?.bookComparison).toEqual({
+      referencePrice: 12,
+      deltaAbsolute: 1,
+      deltaPercent: 0.08,
+      relation: 'worse',
+    });
+  });
+
+  it('marks quick-sell as worse when quote is below best bid', async () => {
+    const { app } = createAppMock({
+      orderBookRows: [
+        {
+          id: 'buy-iron-1',
+          resource_id: 'iron_ore',
+          side: 'buy',
+          price_per_unit: 18,
+          quantity: 5,
+          remaining_quantity: 5,
+          status: 'open',
+          created_at: '2026-03-17T18:00:00.000Z',
+        },
+      ],
+    });
+
+    const result = await getMarketSnapshot(app, 'player-123');
+
+    expect(result.inventory[0]?.bookComparison).toEqual({
+      referencePrice: 18,
+      deltaAbsolute: 3,
+      deltaPercent: 0.17,
+      relation: 'worse',
+    });
   });
 });

@@ -14,6 +14,7 @@ export type ResourceId =
   | 'iron_ingot'
   | 'coal'
   | 'wood'
+  | 'plank'
   | 'crude_oil'
   | 'sand'
   | 'water'
@@ -24,6 +25,7 @@ export const resourceIds = [
   'iron_ingot',
   'coal',
   'wood',
+  'plank',
   'crude_oil',
   'sand',
   'water',
@@ -243,6 +245,7 @@ export interface MarketInventoryItem {
   marketContextKey: MarketContextKey;
   locationId: string;
   locationNameKey: string;
+  bookComparison?: MarketQuoteComparison;
 }
 
 export type MarketContextKey = 'region_anchor' | 'trade_hub';
@@ -260,12 +263,28 @@ export interface MarketContextPrice {
   contextKey: MarketContextKey;
   price: number;
   modifierPercent: number;
+  bookComparison?: MarketQuoteComparison;
+}
+
+export type MarketQuoteComparisonRelation = 'better' | 'worse' | 'equal' | 'unavailable';
+
+export interface MarketQuoteComparison {
+  referencePrice: number | null;
+  deltaAbsolute: number | null;
+  deltaPercent: number | null;
+  relation: MarketQuoteComparisonRelation;
+}
+
+export interface MarketTopOfBook {
+  bestBid: number | null;
+  bestAsk: number | null;
 }
 
 export interface MarketOfferItem {
   resourceId: ResourceId;
   basePrice: number;
   contextPrices: MarketContextPrice[];
+  topOfBook?: MarketTopOfBook;
 }
 
 export type MarketOrderSide = 'buy' | 'sell';

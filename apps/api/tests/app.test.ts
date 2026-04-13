@@ -527,17 +527,43 @@ describe('buildApp', () => {
         }
 
         if (table === 'market_orders') {
+          let selectedStatus: 'open' | 'filled' | 'cancelled' | null = null;
+
           return {
             select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                order: vi.fn().mockReturnValue({
-                  limit: vi.fn().mockReturnValue({
-                    returns: vi.fn().mockResolvedValue({
-                      data: orderRows,
-                      error: null,
+              eq: vi.fn((column: string, value: string) => {
+                if (column === 'player_id') {
+                  return {
+                    order: vi.fn().mockReturnValue({
+                      limit: vi.fn().mockReturnValue({
+                        returns: vi.fn().mockResolvedValue({
+                          data: orderRows,
+                          error: null,
+                        }),
+                      }),
                     }),
-                  }),
-                }),
+                  };
+                }
+
+                if (column === 'status' && (value === 'open' || value === 'filled' || value === 'cancelled')) {
+                  selectedStatus = value;
+
+                  return {
+                    gt: vi.fn().mockImplementation((gtColumn: string, minimumValue: number) => ({
+                      returns: vi.fn().mockResolvedValue({
+                        data: orderRows.filter(
+                          (entry) =>
+                            entry.status === selectedStatus &&
+                            (gtColumn !== 'remaining_quantity' ||
+                              entry.remaining_quantity > minimumValue),
+                        ),
+                        error: null,
+                      }),
+                    })),
+                  };
+                }
+
+                throw new Error(`Unexpected market_orders filter ${column}`);
               }),
             }),
           };
@@ -1092,13 +1118,29 @@ describe('buildApp', () => {
               contextKey: 'region_anchor',
               price: 13,
               modifierPercent: 0.08,
+              bookComparison: {
+                referencePrice: null,
+                deltaAbsolute: null,
+                deltaPercent: null,
+                relation: 'unavailable',
+              },
             },
             {
               contextKey: 'trade_hub',
               price: 13,
               modifierPercent: 0.08,
+              bookComparison: {
+                referencePrice: null,
+                deltaAbsolute: null,
+                deltaPercent: null,
+                relation: 'unavailable',
+              },
             },
           ],
+          topOfBook: {
+            bestBid: null,
+            bestAsk: null,
+          },
         },
         {
           resourceId: 'iron_ore',
@@ -1108,13 +1150,29 @@ describe('buildApp', () => {
               contextKey: 'region_anchor',
               price: 16,
               modifierPercent: -0.11,
+              bookComparison: {
+                referencePrice: null,
+                deltaAbsolute: null,
+                deltaPercent: null,
+                relation: 'unavailable',
+              },
             },
             {
               contextKey: 'trade_hub',
               price: 20,
               modifierPercent: 0.11,
+              bookComparison: {
+                referencePrice: null,
+                deltaAbsolute: null,
+                deltaPercent: null,
+                relation: 'unavailable',
+              },
             },
           ],
+          topOfBook: {
+            bestBid: null,
+            bestAsk: null,
+          },
         },
       ],
       inventory: [
@@ -1129,6 +1187,12 @@ describe('buildApp', () => {
           marketContextKey: 'region_anchor',
           locationId: 'location-primary',
           locationNameKey: 'locations.primary_storage.name',
+          bookComparison: {
+            referencePrice: null,
+            deltaAbsolute: null,
+            deltaPercent: null,
+            relation: 'unavailable',
+          },
         },
       ],
       orders: [

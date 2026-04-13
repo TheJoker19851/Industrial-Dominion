@@ -5,7 +5,10 @@ import {
   type ResourceId,
 } from '@industrial-dominion/shared';
 
-const STARTER_TRANSFORM_RECIPE_KEY = 'iron_ingot_from_iron_ore';
+const RECIPES_REQUIRING_PROCESSING_INSTALLATION = new Set([
+  'iron_ingot_from_iron_ore',
+  'plank_from_wood',
+]);
 const STARTER_PROCESSING_INSTALLATION_BUILDING_TYPE_ID =
   'starter_processing_installation';
 
@@ -56,7 +59,7 @@ export async function createProductionJob(
     throw new Error('Production runs must be at least 1.');
   }
 
-  if (recipe.key === STARTER_TRANSFORM_RECIPE_KEY) {
+  if (RECIPES_REQUIRING_PROCESSING_INSTALLATION.has(recipe.key)) {
     const hasProcessingInstallation = await hasStarterProcessingInstallation(app, input.playerId);
 
     if (!hasProcessingInstallation) {

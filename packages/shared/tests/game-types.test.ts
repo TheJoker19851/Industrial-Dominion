@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { starterRegionIds, starterResourceIds } from '../src/types/game';
+import { resourceIds, starterRegionIds, starterResourceIds } from '../src/types/game';
 
 describe('shared domain type constants', () => {
   it('keeps the starter regions aligned with the world seed', () => {
@@ -21,5 +21,9 @@ describe('shared domain type constants', () => {
       'water',
       'crops',
     ]);
+  });
+
+  it('includes plank as a processed resource', () => {
+    expect(resourceIds).toContain('plank');
   });
 });

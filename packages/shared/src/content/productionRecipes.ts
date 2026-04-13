@@ -10,6 +10,15 @@ export const productionRecipeCatalog = [
     outputResourceId: 'iron_ingot',
     outputAmount: 1,
   },
+  {
+    key: 'plank_from_wood',
+    nameKey: 'productionRecipes.plank_from_wood.name',
+    descriptionKey: 'productionRecipes.plank_from_wood.description',
+    inputResourceId: 'wood',
+    inputAmount: 2,
+    outputResourceId: 'plank',
+    outputAmount: 1,
+  },
 ] as const satisfies readonly ProductionRecipeDefinition[];
 
 export function getProductionRecipe(recipeKey: string) {

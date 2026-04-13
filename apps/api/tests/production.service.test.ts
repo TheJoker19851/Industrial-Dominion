@@ -18,19 +18,26 @@ function createAppMock(options?: { hasProcessingInstallation?: boolean }) {
       });
     }
 
+    const recipeKey = payload.p_recipe_key as string;
+    const isPlankRecipe = recipeKey === 'plank_from_wood';
+    const inputResourceId = isPlankRecipe ? 'wood' : 'iron_ore';
+    const outputResourceId = isPlankRecipe ? 'plank' : 'iron_ingot';
+    const inputAmount = 2 * (payload.p_runs as number);
+    const outputAmount = 1 * (payload.p_runs as number);
+
     return Promise.resolve({
       data: [
         {
           job_id: 'production-job-123',
           building_id: 'building-123',
-          recipe_key: 'iron_ingot_from_iron_ore',
-          runs: 3,
-          input_resource_id: 'iron_ore',
-          input_amount: 6,
+          recipe_key: recipeKey,
+          runs: payload.p_runs,
+          input_resource_id: inputResourceId,
+          input_amount: inputAmount,
           input_inventory_quantity: 10,
-          output_resource_id: 'iron_ingot',
-          output_amount: 3,
-          output_inventory_quantity: 3,
+          output_resource_id: outputResourceId,
+          output_amount: outputAmount,
+          output_inventory_quantity: outputAmount,
           completed_at: '2026-03-17T12:00:00.000Z',
         },
       ],
@@ -139,5 +146,22 @@ describe('production service', () => {
     ).rejects.toThrow('Starter processing installation required for production.');
 
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('creates a plank production job using the plank_from_wood recipe', async () => {
+    const { app, rpc } = createAppMock();
+
+    const result = await createProductionJob(app, {
+      playerId: 'player-123',
+      recipeKey: 'plank_from_wood',
+      runs: 2,
+    });
+
+    expect(result.recipeKey).toBe('plank_from_wood');
+    expect(rpc).toHaveBeenCalledWith('create_production_job', {
+      p_player_id: 'player-123',
+      p_recipe_key: 'plank_from_wood',
+      p_runs: 2,
+    });
   });
 });

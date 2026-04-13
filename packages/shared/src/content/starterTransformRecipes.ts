@@ -12,6 +12,17 @@ export const starterTransformRecipes = [
     outputAmount: 6,
     durationSeconds: 3600,
   },
+  {
+    id: 'greenhaven_plank_batch',
+    buildingTypeId: 'greenhaven_timber_extractor',
+    nameKey: 'transforms.greenhaven_plank_batch.name',
+    descriptionKey: 'transforms.greenhaven_plank_batch.description',
+    inputResourceId: 'wood',
+    inputAmount: 12,
+    outputResourceId: 'plank',
+    outputAmount: 6,
+    durationSeconds: 1800,
+  },
 ] as const satisfies readonly ProductionTransformRecipeDefinition[];
 
 export function getStarterTransformRecipesForBuildingType(buildingTypeId: string) {

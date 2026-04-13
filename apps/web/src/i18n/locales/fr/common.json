@@ -522,6 +522,9 @@
     "wood": {
       "name": "Bois"
     },
+    "plank": {
+      "name": "Planche"
+    },
     "crude_oil": {
       "name": "Petrole brut"
     },
@@ -641,12 +644,20 @@
     "ironridge_iron_ingot_batch": {
       "name": "Lot de lingots de fer",
       "description": "Raffinez un premier lot de minerai de fer pour obtenir un plus petit volume de lingots industriels."
+    },
+    "greenhaven_plank_batch": {
+      "name": "Lot de planches",
+      "description": "Sciez un premier lot de bois en planches pretes pour la construction."
     }
   },
   "productionRecipes": {
     "iron_ingot_from_iron_ore": {
       "name": "Cycle de lingots de fer",
       "description": "Convertit un petit lot de minerai de fer en lingots de fer avec le flux de production de depart le plus simple."
+    },
+    "plank_from_wood": {
+      "name": "Cycle de planches",
+      "description": "Convertit un petit lot de bois en planches avec le flux de production de depart le plus simple."
     }
   },
   "gameplayErrors": {
