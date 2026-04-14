@@ -22,7 +22,7 @@ insert into resources (
 )
 values
   ('iron_ore', 'resources.iron_ore.name', 'raw', 1, 18, true, true),
-  ('iron_ingot', 'resources.iron_ingot.name', 'processed', 2, 42, false, true),
+  ('iron_ingot', 'resources.iron_ingot.name', 'processed', 2, 42, true, true),
   ('coal', 'resources.coal.name', 'raw', 1, 14, true, true),
   ('wood', 'resources.wood.name', 'raw', 1, 10, true, true),
   ('plank', 'resources.plank.name', 'processed', 2, 26, true, true),

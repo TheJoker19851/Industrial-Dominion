@@ -26,6 +26,9 @@ No blocked tasks.
 No scheduled tasks. Capture new work here using the required format.
 
 ## Completed (Recent)
+- TASK-052 — Iron Ore to Iron Ingot Industrial Value Chain MVP — Status: done
+- TASK-051 — Industrial Decision Validation (Wood → Plank) — Status: done
+- TASK-050 — Wood to Planks Industrial Value Chain MVP — Status: done
 - TASK-038 — Starter Processing Installation Placement MVP — Status: done
 - TASK-037 — Market Depth MVP (Limit Orders) — Status: done
 - TASK-036 — Logistics Transfer MVP — Status: done

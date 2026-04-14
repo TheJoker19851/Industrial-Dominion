@@ -45,7 +45,7 @@ describe('starter seed SQL', () => {
 
     expect(resourceValues.match(/'raw'/g)).toHaveLength(starterResourceIds.length);
     expect(resourceValues.match(/, true, true\)/g)).toHaveLength(
-      starterResourceIds.length + 1,
+      starterResourceIds.length + 2,
     );
     expect(resourceValues).toContain("'iron_ingot'");
     expect(resourceValues).toContain("'resources.iron_ingot.name'");

@@ -251,3 +251,44 @@ Implementation journal for Codex and future contributors.
 - Reused the extractor placement pattern while keeping scope narrow: bootstrap validation, extractor prerequisite validation, one-time placement validation, build ledger write, and dashboard snapshot visibility for placed processing installation state.
 - Extended dashboard API/UI with a mobile-safe processing-installation CTA and installed-state card, added EN/FR i18n keys plus gameplay error mappings, and updated shared/api/web tests for the new snapshot and placement flow.
 - Re-ran `corepack pnpm lint`, `corepack pnpm typecheck`, `corepack pnpm build`, `corepack pnpm test`, and `corepack pnpm check:i18n`.
+
+### 2026-04-13 - TASK-050
+
+First real industrial transformation implemented:
+- wood → plank via instant production recipe (2:1 ratio) and timed Greenhaven batch transform (12 wood → 6 planks, 1800s)
+- plank introduced as tradable processed resource (tier 2, base_price 26)
+- generalized `create_production_job` and `start_transform_job` SQL RPCs (removed iron-only hardcoding)
+- production service updated to support multiple processing-installation recipes via Set lookup
+- MarketPage type fix (hardcoded literal union → shared `ResourceId` type)
+
+This marks the transition from pure market economy to industrial gameplay.
+
+Validated:
+- raw vs processed trade-off exists (wood base_price 10 vs plank base_price 26)
+- plank participates in market correctly (tradable, storable, tier 2)
+- all 193 tests pass (84 API + 21 shared + 88 web)
+- typecheck, build, i18n all clean
+- Migration `0014_wood_to_planks.sql` ready for deployment
+
+### 2026-04-13 - TASK-051
+
+Industrial decision validation for the wood → plank chain:
+- Quantified processing premium at base prices: ~25% net gain over raw sell (20 credits vs 25 credits per plank-equivalent)
+- Confirmed Greenhaven regional context amplifies processing incentive to ~44% (suppressed wood sell price)
+- Verified breakeven at plank/wood price ratio of exactly 2.0; current ratio is 2.6 giving healthy margin
+- Validated price sensitivity: ±1-credit moves near breakeven flip the decision
+- Confirmed thin but positive arbitrage buying wood to process (5-7 credits per plank)
+- Plank is the first tradable processed resource (iron_ingot is non-tradable), enabling the game's first real industrial market decision
+- Added 32 targeted validation tests in `apps/api/tests/industrial-decision-validation.test.ts`
+
+Verdict: **READY FOR NEXT INDUSTRIAL EXPANSION**
+
+### 2026-04-14 - TASK-052
+
+Second industrial value chain activated: iron_ore → iron_ingot
+- Changed iron_ingot from non-tradable to tradable (single DB flag flip)
+- All existing infrastructure already in place: recipes, production service, transform RPCs, i18n, market-context premiums (0.18 sell / 0.10 buy at trade hub)
+- Migration `0015_iron_ingot_tradable.sql` makes the change deployable
+- Updated seed.sql and economic validation tests
+- Both processed resources (plank, iron_ingot) now create real raw-vs-processed market decisions
+- All 119 API + 21 shared + 88 web tests pass; typecheck, build, i18n clean
