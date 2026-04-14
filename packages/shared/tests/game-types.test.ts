@@ -26,4 +26,8 @@ describe('shared domain type constants', () => {
   it('includes plank as a processed resource', () => {
     expect(resourceIds).toContain('plank');
   });
+
+  it('includes fuel as a processed resource', () => {
+    expect(resourceIds).toContain('fuel');
+  });
 });

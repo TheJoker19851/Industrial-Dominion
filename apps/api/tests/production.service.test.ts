@@ -20,8 +20,9 @@ function createAppMock(options?: { hasProcessingInstallation?: boolean }) {
 
     const recipeKey = payload.p_recipe_key as string;
     const isPlankRecipe = recipeKey === 'plank_from_wood';
-    const inputResourceId = isPlankRecipe ? 'wood' : 'iron_ore';
-    const outputResourceId = isPlankRecipe ? 'plank' : 'iron_ingot';
+    const isFuelRecipe = recipeKey === 'fuel_from_crude_oil';
+    const inputResourceId = isFuelRecipe ? 'crude_oil' : isPlankRecipe ? 'wood' : 'iron_ore';
+    const outputResourceId = isFuelRecipe ? 'fuel' : isPlankRecipe ? 'plank' : 'iron_ingot';
     const inputAmount = 2 * (payload.p_runs as number);
     const outputAmount = 1 * (payload.p_runs as number);
 
@@ -162,6 +163,27 @@ describe('production service', () => {
       p_player_id: 'player-123',
       p_recipe_key: 'plank_from_wood',
       p_runs: 2,
+    });
+  });
+
+  it('creates a fuel production job using the fuel_from_crude_oil recipe', async () => {
+    const { app, rpc } = createAppMock();
+
+    const result = await createProductionJob(app, {
+      playerId: 'player-123',
+      recipeKey: 'fuel_from_crude_oil',
+      runs: 4,
+    });
+
+    expect(result.recipeKey).toBe('fuel_from_crude_oil');
+    expect(result.inputResourceId).toBe('crude_oil');
+    expect(result.outputResourceId).toBe('fuel');
+    expect(result.inputAmount).toBe(8);
+    expect(result.outputAmount).toBe(4);
+    expect(rpc).toHaveBeenCalledWith('create_production_job', {
+      p_player_id: 'player-123',
+      p_recipe_key: 'fuel_from_crude_oil',
+      p_runs: 4,
     });
   });
 });

@@ -292,3 +292,14 @@ Second industrial value chain activated: iron_ore → iron_ingot
 - Updated seed.sql and economic validation tests
 - Both processed resources (plank, iron_ingot) now create real raw-vs-processed market decisions
 - All 119 API + 21 shared + 88 web tests pass; typecheck, build, i18n clean
+
+### 2026-04-14 - TASK-053
+
+Third industrial value chain: crude_oil → fuel
+- Added `fuel` as new tradable processed resource (tier 2, base_price 48)
+- Instant production recipe `fuel_from_crude_oil` (2 crude_oil → 1 fuel)
+- Batch transform recipe `sunbarrel_fuel_batch` (12 crude_oil → 6 fuel, 2400s) for Sunbarrel oil extractor
+- Migration `0016_crude_oil_to_fuel.sql` adds resource, recipes, and updates `start_transform_job` RPC to support sunbarrel buildings
+- Added fuel to production service processing installation Set
+- EN/FR i18n strings for fuel resource, transform, and production recipe
+- All 120 API + 21 shared + 88 web tests pass; typecheck, build, i18n clean

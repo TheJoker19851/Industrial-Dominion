@@ -37,4 +37,22 @@ describe('starter transform recipes', () => {
       ]),
     );
   });
+
+  it('defines the crude oil to fuel transform recipe for sunbarrel', () => {
+    expect(starterTransformRecipes).toEqual(
+      expect.arrayContaining([
+        {
+          id: 'sunbarrel_fuel_batch',
+          buildingTypeId: 'sunbarrel_oil_extractor',
+          nameKey: 'transforms.sunbarrel_fuel_batch.name',
+          descriptionKey: 'transforms.sunbarrel_fuel_batch.description',
+          inputResourceId: 'crude_oil',
+          inputAmount: 12,
+          outputResourceId: 'fuel',
+          outputAmount: 6,
+          durationSeconds: 2400,
+        },
+      ]),
+    );
+  });
 });

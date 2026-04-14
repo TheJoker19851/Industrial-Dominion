@@ -528,6 +528,9 @@
     "crude_oil": {
       "name": "Crude oil"
     },
+    "fuel": {
+      "name": "Fuel"
+    },
     "sand": {
       "name": "Sand"
     },
@@ -648,6 +651,10 @@
     "greenhaven_plank_batch": {
       "name": "Plank batch",
       "description": "Saw a starter batch of wood into construction-ready planks."
+    },
+    "sunbarrel_fuel_batch": {
+      "name": "Fuel batch",
+      "description": "Refine a starter batch of crude oil into industrial fuel."
     }
   },
   "productionRecipes": {
@@ -658,6 +665,10 @@
     "plank_from_wood": {
       "name": "Plank run",
       "description": "Convert a small batch of wood into planks using the simplest possible starter production flow."
+    },
+    "fuel_from_crude_oil": {
+      "name": "Fuel run",
+      "description": "Refine a small batch of crude oil into fuel using the simplest possible starter production flow."
     }
   },
   "gameplayErrors": {

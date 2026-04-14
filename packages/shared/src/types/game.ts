@@ -16,6 +16,7 @@ export type ResourceId =
   | 'wood'
   | 'plank'
   | 'crude_oil'
+  | 'fuel'
   | 'sand'
   | 'water'
   | 'crops';
@@ -27,6 +28,7 @@ export const resourceIds = [
   'wood',
   'plank',
   'crude_oil',
+  'fuel',
   'sand',
   'water',
   'crops',

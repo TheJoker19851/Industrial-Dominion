@@ -37,4 +37,18 @@ describe('production recipe catalog', () => {
       outputAmount: 1,
     });
   });
+
+  it('defines the crude oil to fuel recipe with correct ratio', () => {
+    const fuelRecipe = getProductionRecipe('fuel_from_crude_oil');
+
+    expect(fuelRecipe).toEqual({
+      key: 'fuel_from_crude_oil',
+      nameKey: 'productionRecipes.fuel_from_crude_oil.name',
+      descriptionKey: 'productionRecipes.fuel_from_crude_oil.description',
+      inputResourceId: 'crude_oil',
+      inputAmount: 2,
+      outputResourceId: 'fuel',
+      outputAmount: 1,
+    });
+  });
 });

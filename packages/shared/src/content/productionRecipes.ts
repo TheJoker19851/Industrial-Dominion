@@ -19,6 +19,15 @@ export const productionRecipeCatalog = [
     outputResourceId: 'plank',
     outputAmount: 1,
   },
+  {
+    key: 'fuel_from_crude_oil',
+    nameKey: 'productionRecipes.fuel_from_crude_oil.name',
+    descriptionKey: 'productionRecipes.fuel_from_crude_oil.description',
+    inputResourceId: 'crude_oil',
+    inputAmount: 2,
+    outputResourceId: 'fuel',
+    outputAmount: 1,
+  },
 ] as const satisfies readonly ProductionRecipeDefinition[];
 
 export function getProductionRecipe(recipeKey: string) {

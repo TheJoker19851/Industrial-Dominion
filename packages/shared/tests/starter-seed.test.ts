@@ -45,13 +45,15 @@ describe('starter seed SQL', () => {
 
     expect(resourceValues.match(/'raw'/g)).toHaveLength(starterResourceIds.length);
     expect(resourceValues.match(/, true, true\)/g)).toHaveLength(
-      starterResourceIds.length + 2,
+      starterResourceIds.length + 3,
     );
     expect(resourceValues).toContain("'iron_ingot'");
     expect(resourceValues).toContain("'resources.iron_ingot.name'");
     expect(resourceValues).toContain("'processed'");
     expect(resourceValues).toContain("'plank'");
     expect(resourceValues).toContain("'resources.plank.name'");
+    expect(resourceValues).toContain("'fuel'");
+    expect(resourceValues).toContain("'resources.fuel.name'");
   });
 
   it('seeds the starter extractor building types', () => {
@@ -76,5 +78,8 @@ describe('starter seed SQL', () => {
     expect(recipeValues).toContain("'greenhaven_plank_batch'");
     expect(recipeValues).toContain("'plank'");
     expect(recipeValues).toContain(', 12, 6, 1800)');
+    expect(recipeValues).toContain("'sunbarrel_fuel_batch'");
+    expect(recipeValues).toContain("'fuel'");
+    expect(recipeValues).toContain(', 12, 6, 2400)');
   });
 });

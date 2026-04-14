@@ -26,6 +26,7 @@ No blocked tasks.
 No scheduled tasks. Capture new work here using the required format.
 
 ## Completed (Recent)
+- TASK-053 — Crude Oil to Fuel Industrial Value Chain MVP — Status: done
 - TASK-052 — Iron Ore to Iron Ingot Industrial Value Chain MVP — Status: done
 - TASK-051 — Industrial Decision Validation (Wood → Plank) — Status: done
 - TASK-050 — Wood to Planks Industrial Value Chain MVP — Status: done

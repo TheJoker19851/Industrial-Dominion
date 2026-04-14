@@ -528,6 +528,9 @@
     "crude_oil": {
       "name": "Petrole brut"
     },
+    "fuel": {
+      "name": "Carburant"
+    },
     "sand": {
       "name": "Sable"
     },
@@ -648,6 +651,10 @@
     "greenhaven_plank_batch": {
       "name": "Lot de planches",
       "description": "Sciez un premier lot de bois en planches pretes pour la construction."
+    },
+    "sunbarrel_fuel_batch": {
+      "name": "Lot de carburant",
+      "description": "Raffinez un premier lot de petrole brut en carburant industriel."
     }
   },
   "productionRecipes": {
@@ -658,6 +665,10 @@
     "plank_from_wood": {
       "name": "Cycle de planches",
       "description": "Convertit un petit lot de bois en planches avec le flux de production de depart le plus simple."
+    },
+    "fuel_from_crude_oil": {
+      "name": "Cycle de carburant",
+      "description": "Raffine un petit lot de petrole brut en carburant avec le flux de production de depart le plus simple."
     }
   },
   "gameplayErrors": {

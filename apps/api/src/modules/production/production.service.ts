@@ -8,6 +8,7 @@ import {
 const RECIPES_REQUIRING_PROCESSING_INSTALLATION = new Set([
   'iron_ingot_from_iron_ore',
   'plank_from_wood',
+  'fuel_from_crude_oil',
 ]);
 const STARTER_PROCESSING_INSTALLATION_BUILDING_TYPE_ID =
   'starter_processing_installation';

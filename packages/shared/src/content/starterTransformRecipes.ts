@@ -23,6 +23,17 @@ export const starterTransformRecipes = [
     outputAmount: 6,
     durationSeconds: 1800,
   },
+  {
+    id: 'sunbarrel_fuel_batch',
+    buildingTypeId: 'sunbarrel_oil_extractor',
+    nameKey: 'transforms.sunbarrel_fuel_batch.name',
+    descriptionKey: 'transforms.sunbarrel_fuel_batch.description',
+    inputResourceId: 'crude_oil',
+    inputAmount: 12,
+    outputResourceId: 'fuel',
+    outputAmount: 6,
+    durationSeconds: 2400,
+  },
 ] as const satisfies readonly ProductionTransformRecipeDefinition[];
 
 export function getStarterTransformRecipesForBuildingType(buildingTypeId: string) {
