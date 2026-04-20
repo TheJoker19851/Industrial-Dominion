@@ -303,3 +303,17 @@ Third industrial value chain: crude_oil → fuel
 - Added fuel to production service processing installation Set
 - EN/FR i18n strings for fuel resource, transform, and production recipe
 - All 120 API + 21 shared + 88 web tests pass; typecheck, build, i18n clean
+
+### 2026-04-14 - TASK-054
+
+Multi-chain industrial decision validation across all three chains (wood→plank, iron→ingot, oil→fuel):
+- Added 63 targeted validation tests in `multi-chain-industrial-validation.test.ts`
+- Confirmed chains are economically differentiated: plank ~25% margin, iron ~17% margin, fuel ~6% margin
+- Regional anchor amplifies processing incentive on every chain (sell pressure on raw, no modifier on processed)
+- Iron chain has unique trade_hub premiums (+18% sell, +10% buy) creating a third distinct price context
+- All chains flip from "process wins" to "raw wins" within ±1 credit of the 2:1 breakeven
+- Batch durations differ: wood 1800s < oil 2400s < iron 3600s (time-value tradeoff)
+- System is NOT static — regional context, trade hub, order book, and spread create meaningful price variation
+- All 183 API + 21 shared + 88 web = 292 total tests pass
+
+Verdict: **INDUSTRIAL SYSTEM IS READY FOR EXPANSION**

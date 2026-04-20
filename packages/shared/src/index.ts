@@ -6,3 +6,6 @@ export * from './content/starterTransformRecipes.js';
 export * from './content/tutorialSteps.js';
 export * from './content/starterTutorial.js';
 export * from './economics/formulas.js';
+export * from './economics/slippage.js';
+export * from './economics/logistics.js';
+export * from './economics/arbitrage.js';

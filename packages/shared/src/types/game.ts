@@ -236,6 +236,15 @@ export interface DashboardTransformRecipeSummary {
   activeJob: DashboardTransformJobSummary | null;
 }
 
+export interface SlippageQuote {
+  anchorPrice: number;
+  effectiveAvgPrice: number;
+  totalGross: number;
+  slippageBps: number;
+  slippagePercent: number;
+  side: MarketOrderSide;
+}
+
 export interface MarketInventoryItem {
   resourceId: ResourceId;
   quantity: number;
@@ -248,6 +257,7 @@ export interface MarketInventoryItem {
   locationId: string;
   locationNameKey: string;
   bookComparison?: MarketQuoteComparison;
+  slippage?: SlippageQuote;
 }
 
 export type MarketContextKey = 'region_anchor' | 'trade_hub';
@@ -324,6 +334,7 @@ export interface MarketSellResult {
   orderId: string;
   marketContextKey: MarketContextKey;
   locationId: string;
+  slippage?: SlippageQuote;
 }
 
 export interface MarketBuyResult {
@@ -336,6 +347,7 @@ export interface MarketBuyResult {
   orderId: string;
   marketContextKey: MarketContextKey;
   locationId: string;
+  slippage?: SlippageQuote;
 }
 
 export interface MarketLimitOrderResult {

@@ -16,8 +16,10 @@ import type {
   PlayerProfile,
   RegionId,
   ResourceId,
+  SlippageQuote,
   SupportedLocale,
 } from '@industrial-dominion/shared';
+import { calculateSlippageQuote } from '@industrial-dominion/shared';
 import { readPlayerLocations } from '../../db/player-locations.js';
 import { buildMarketContexts, getMarketContextPrice } from './market-context.js';
 
@@ -180,6 +182,10 @@ function mapPlayer(player: PlayerRow | null): PlayerProfile | null {
   };
 }
 
+function optionalSlippage(quote: SlippageQuote): SlippageQuote | undefined {
+  return quote.slippageBps > 0 ? quote : undefined;
+}
+
 function mapOfferItem(input: {
   entry: OfferRow;
   playerRegionId: RegionId | undefined;
@@ -286,6 +292,12 @@ function mapInventoryItem(input: {
     side: 'sell',
   }).price;
   const effectivePrice = applyInstantTradeSpread(contextPrice, 'sell');
+  const slippage = calculateSlippageQuote({
+    anchorPrice: effectivePrice,
+    quantity: entry.quantity,
+    side: 'sell',
+    resourceId: entry.resource_id,
+  });
   const grossValue = effectivePrice * entry.quantity;
   const feeAmount = Math.round(grossValue * gameConfig.marketFee);
   const netValue = grossValue - feeAmount;
@@ -306,6 +318,7 @@ function mapInventoryItem(input: {
       referencePrice: topOfBookByResource.get(entry.resource_id)?.bestBid ?? null,
       side: 'sell',
     }),
+    slippage: optionalSlippage(slippage),
   };
 }
 
@@ -481,7 +494,14 @@ export async function buyResource(
     basePrice: resourceRow.base_price,
     side: 'buy',
   }).price;
-  const price = applyInstantTradeSpread(marketContextPrice, 'buy');
+  const spreadPrice = applyInstantTradeSpread(marketContextPrice, 'buy');
+  const slippage = calculateSlippageQuote({
+    anchorPrice: spreadPrice,
+    quantity: input.quantity,
+    side: 'buy',
+    resourceId: input.resourceId,
+  });
+  const price = Math.max(1, Math.round(slippage.totalGross / input.quantity));
 
   const { data, error } = await app.getSupabaseAdminClient().rpc('buy_market_resource_at_location', {
     p_player_id: input.playerId,
@@ -512,6 +532,7 @@ export async function buyResource(
     orderId: result.order_id,
     marketContextKey: result.market_context_key,
     locationId: result.location_id,
+    slippage: optionalSlippage(slippage),
   };
 }
 
@@ -552,7 +573,14 @@ export async function sellResource(
     basePrice: resourceRow.base_price,
     side: 'sell',
   }).price;
-  const price = applyInstantTradeSpread(marketContextPrice, 'sell');
+  const spreadPrice = applyInstantTradeSpread(marketContextPrice, 'sell');
+  const slippage = calculateSlippageQuote({
+    anchorPrice: spreadPrice,
+    quantity: input.quantity,
+    side: 'sell',
+    resourceId: input.resourceId,
+  });
+  const price = Math.max(1, Math.round(slippage.totalGross / input.quantity));
 
   const { data, error } = await app.getSupabaseAdminClient().rpc('sell_inventory_resource_at_location', {
     p_player_id: input.playerId,
@@ -586,6 +614,7 @@ export async function sellResource(
     orderId: result.order_id,
     marketContextKey: result.market_context_key,
     locationId: result.location_id,
+    slippage: optionalSlippage(slippage),
   };
 }
 
