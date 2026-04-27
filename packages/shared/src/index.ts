@@ -9,3 +9,4 @@ export * from './economics/formulas.js';
 export * from './economics/slippage.js';
 export * from './economics/logistics.js';
 export * from './economics/arbitrage.js';
+export * from './economics/decision.js';

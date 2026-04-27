@@ -1,5 +1,47 @@
-import type { DashboardSnapshot } from '@industrial-dominion/shared';
+import type {
+  DashboardSnapshot,
+  EconomicDecisionSnapshot,
+  RegionId,
+  ResourceId,
+  StrategyResult,
+} from '@industrial-dominion/shared';
 import { apiRequest } from '@/lib/api';
+
+export type EconomicStrategy =
+  | 'SELL_LOCAL'
+  | 'PROCESS_AND_SELL_LOCAL'
+  | 'TRANSPORT_AND_SELL'
+  | 'PROCESS_THEN_TRANSPORT_AND_SELL';
+
+export interface DecisionExecutionResult {
+  decisionId: string;
+  orderId: string;
+  pricePerUnit: number;
+  grossAmount: number;
+  feeAmount: number;
+  netAmount: number;
+  inventoryQuantity: number;
+  playerCredits: number;
+  strategy: EconomicStrategy;
+  resource: ResourceId;
+  quantity: number;
+  region: RegionId;
+  outputResourceId?: ResourceId;
+  inputConsumed?: number;
+  outputProduced?: number;
+}
+
+export interface DecisionHistoryEntry {
+  id: string;
+  strategy: EconomicStrategy;
+  resourceId: ResourceId;
+  quantity: number;
+  originRegion: RegionId;
+  destinationRegion: RegionId | null;
+  result: Record<string, unknown>;
+  status: string;
+  createdAt: string;
+}
 
 export function getDashboardSnapshot(accessToken: string) {
   return apiRequest<DashboardSnapshot>('/dashboard', {
@@ -100,4 +142,109 @@ export function createLogisticsTransfer(input: {
       quantity: input.quantity,
     }),
   });
+}
+
+export function previewEconomicDecision(input: {
+  accessToken: string;
+  resource: ResourceId;
+  quantity: number;
+  region: RegionId;
+}) {
+  return apiRequest<EconomicDecisionSnapshot>('/economics/decision-preview', {
+    method: 'POST',
+    accessToken: input.accessToken,
+    body: JSON.stringify({
+      resource: input.resource,
+      quantity: input.quantity,
+      region: input.region,
+    }),
+  });
+}
+
+export interface BatchAnalysisEntry {
+  resource: ResourceId;
+  quantity: number;
+  region: RegionId;
+  snapshot: { ranked: StrategyResult[] };
+}
+
+export interface BatchAnalysisResult {
+  analyses: BatchAnalysisEntry[];
+}
+
+export function batchAnalyzeDecision(input: {
+  accessToken: string;
+  resource: ResourceId;
+  quantities: number[];
+  regions: RegionId[];
+}) {
+  return apiRequest<BatchAnalysisResult>('/economics/batch-analysis', {
+    method: 'POST',
+    accessToken: input.accessToken,
+    body: JSON.stringify({
+      resource: input.resource,
+      quantities: input.quantities,
+      regions: input.regions,
+    }),
+  });
+}
+
+export interface MarketSignal {
+  key: string;
+  severity: 'info' | 'caution' | 'warning';
+  params: Record<string, string | number>;
+}
+
+export interface MarketSignalsResult {
+  signals: MarketSignal[];
+}
+
+export function getMarketSignals(input: {
+  accessToken: string;
+  resource: ResourceId;
+  quantity: number;
+  region: RegionId;
+}) {
+  return apiRequest<MarketSignalsResult>('/economics/market-signals', {
+    method: 'POST',
+    accessToken: input.accessToken,
+    body: JSON.stringify({
+      resource: input.resource,
+      quantity: input.quantity,
+      region: input.region,
+    }),
+  });
+}
+
+export function executeDecision(input: {
+  accessToken: string;
+  strategy: EconomicStrategy;
+  resource: ResourceId;
+  quantity: number;
+  region: RegionId;
+}) {
+  return apiRequest<DecisionExecutionResult>('/economics/decision-execute', {
+    method: 'POST',
+    accessToken: input.accessToken,
+    body: JSON.stringify({
+      strategy: input.strategy,
+      resource: input.resource,
+      quantity: input.quantity,
+      region: input.region,
+    }),
+  });
+}
+
+export function getDecisionHistory(input: {
+  accessToken: string;
+  limit?: number;
+}) {
+  const params = input.limit ? `?limit=${input.limit}` : '';
+  return apiRequest<{ history: DecisionHistoryEntry[] }>(
+    `/economics/decision-history${params}`,
+    {
+      method: 'GET',
+      accessToken: input.accessToken,
+    },
+  );
 }

@@ -4,6 +4,7 @@ import { authRoutes } from './auth/auth.routes.js';
 import { bootstrapRoutes } from './bootstrap/bootstrap.routes.js';
 import { buildingRoutes } from './buildings/buildings.routes.js';
 import { dashboardRoutes } from './dashboard/dashboard.routes.js';
+import { economicsRoutes } from './economics/economics.routes.js';
 import { healthRoutes } from './health/health.routes.js';
 import { ledgerRoutes } from './ledger/ledger.routes.js';
 import { logisticsRoutes } from './logistics/logistics.routes.js';
@@ -18,6 +19,7 @@ export async function registerModules(app: FastifyInstance) {
   await app.register(supabasePlugin);
   await app.register(authPlugin);
   await app.register(dashboardRoutes, { prefix: '/dashboard' });
+  await app.register(economicsRoutes, { prefix: '/economics' });
   await app.register(ledgerRoutes, { prefix: '/ledger' });
   await app.register(logisticsRoutes, { prefix: '/logistics' });
   await app.register(marketRoutes, { prefix: '/market' });

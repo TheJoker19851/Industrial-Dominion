@@ -255,6 +255,7 @@ Implementation journal for Codex and future contributors.
 ### 2026-04-13 - TASK-050
 
 First real industrial transformation implemented:
+
 - wood → plank via instant production recipe (2:1 ratio) and timed Greenhaven batch transform (12 wood → 6 planks, 1800s)
 - plank introduced as tradable processed resource (tier 2, base_price 26)
 - generalized `create_production_job` and `start_transform_job` SQL RPCs (removed iron-only hardcoding)
@@ -264,6 +265,7 @@ First real industrial transformation implemented:
 This marks the transition from pure market economy to industrial gameplay.
 
 Validated:
+
 - raw vs processed trade-off exists (wood base_price 10 vs plank base_price 26)
 - plank participates in market correctly (tradable, storable, tier 2)
 - all 193 tests pass (84 API + 21 shared + 88 web)
@@ -273,6 +275,7 @@ Validated:
 ### 2026-04-13 - TASK-051
 
 Industrial decision validation for the wood → plank chain:
+
 - Quantified processing premium at base prices: ~25% net gain over raw sell (20 credits vs 25 credits per plank-equivalent)
 - Confirmed Greenhaven regional context amplifies processing incentive to ~44% (suppressed wood sell price)
 - Verified breakeven at plank/wood price ratio of exactly 2.0; current ratio is 2.6 giving healthy margin
@@ -286,6 +289,7 @@ Verdict: **READY FOR NEXT INDUSTRIAL EXPANSION**
 ### 2026-04-14 - TASK-052
 
 Second industrial value chain activated: iron_ore → iron_ingot
+
 - Changed iron_ingot from non-tradable to tradable (single DB flag flip)
 - All existing infrastructure already in place: recipes, production service, transform RPCs, i18n, market-context premiums (0.18 sell / 0.10 buy at trade hub)
 - Migration `0015_iron_ingot_tradable.sql` makes the change deployable
@@ -296,6 +300,7 @@ Second industrial value chain activated: iron_ore → iron_ingot
 ### 2026-04-14 - TASK-053
 
 Third industrial value chain: crude_oil → fuel
+
 - Added `fuel` as new tradable processed resource (tier 2, base_price 48)
 - Instant production recipe `fuel_from_crude_oil` (2 crude_oil → 1 fuel)
 - Batch transform recipe `sunbarrel_fuel_batch` (12 crude_oil → 6 fuel, 2400s) for Sunbarrel oil extractor
@@ -307,6 +312,7 @@ Third industrial value chain: crude_oil → fuel
 ### 2026-04-14 - TASK-054
 
 Multi-chain industrial decision validation across all three chains (wood→plank, iron→ingot, oil→fuel):
+
 - Added 63 targeted validation tests in `multi-chain-industrial-validation.test.ts`
 - Confirmed chains are economically differentiated: plank ~25% margin, iron ~17% margin, fuel ~6% margin
 - Regional anchor amplifies processing incentive on every chain (sell pressure on raw, no modifier on processed)
@@ -317,3 +323,68 @@ Multi-chain industrial decision validation across all three chains (wood→plank
 - All 183 API + 21 shared + 88 web = 292 total tests pass
 
 Verdict: **INDUSTRIAL SYSTEM IS READY FOR EXPANSION**
+
+### 2026-04-23 - TASK-059
+
+Decision Execution & Logging MVP:
+
+- Created `decision_log` table in migration `0017_decision_log.sql` with strategy, resource, quantity, origin/destination regions, result JSONB, and status (executed/recorded/failed)
+- Added `execute_decision_sell_local` atomic RPC that validates inventory, deducts resources, credits the player, creates market order, writes ledger entries, and inserts decision_log — all in one transaction
+- Added `executeDecision` service: SELL_LOCAL calls the atomic RPC; other strategies are recorded as "recorded" (not yet executable in MVP)
+- Added `getDecisionHistory` service: reads from decision_log ordered by most recent
+- Added `POST /economics/decision-execute` route with Zod validation + auth
+- Added `GET /economics/decision-history` route with auth and optional limit param
+- Added frontend API functions `executeDecision` and `getDecisionHistory` in dashboard-api.ts
+- Updated `EconomicDecisionPanel` with Execute button in Prepare flow, execution result display (net, fee, credits), and error handling
+- Added EN/FR i18n keys for execute, executing, executed, fee, credits labels
+- Added 4 integration tests: SELL_LOCAL execution, non-SELL_LOCAL recording, invalid payload, history read
+- All 10 economics tests pass (6 existing + 4 new), 36 shared tests pass, 11 frontend tests pass
+- TypeScript typecheck clean for both API and web projects
+- No duplicated economic logic — reuses slippage, arbitrage, and decision engine from shared package
+
+### 2026-04-25 - TASK-058
+
+- Completed the player-facing decision UX layer in `EconomicDecisionPanel.tsx`
+- Added executable vs preview-only distinction: SELL_LOCAL strategies show Prepare → Execute flow; other strategies show "Preview only" badge with hint text
+- Added decision history section using `useQuery` to fetch `GET /economics/decision-history`, with status badges (Executed/Recorded) and timestamps
+- History auto-refreshes after successful execution via `queryClient.invalidateQueries`
+- Added 7 new i18n keys in EN and FR: decisionPreviewOnly, decisionPreviewOnlyHint, decisionStatusExecuted, decisionStatusRecorded, decisionHistoryTitle, decisionHistoryEmpty, decisionHistoryEntry
+- All 11 decision-format tests pass; TypeScript typecheck clean
+- No duplicated economic logic; frontend consumes backend outputs only
+- Files modified: EconomicDecisionPanel.tsx, en/common.json, fr/common.json, CURRENT_TASK.md, TASK_BACKLOG.md
+
+### 2026-04-25 - TASK-060
+
+- Added 5 integration tests for `POST /economics/batch-analysis` endpoint
+- Created `createBatchAnalysisMock` factory with optional non-tradable resource override
+- Tests cover: valid multi-region multi-quantity request (4 analyses), correct entry shape, invalid payload (empty quantities), non-tradable resource rejection, deterministic results
+- All 15 economics tests pass (6 decision-preview + 5 batch-analysis + 4 execute/history)
+- No duplicated economic logic; tests mock Supabase and verify endpoint behavior only
+- Files modified: economics-decision.test.ts, CURRENT_TASK.md, TASK_BACKLOG.md
+
+### 2026-04-25 - TASK-061
+
+- Added 5 integration tests for `POST /economics/market-signals` endpoint
+- Tests cover: valid request with signal output, correct signal shape (key/severity/params), invalid payload rejection, non-tradable resource rejection, EXCEEDS_LIQUIDITY_DEPTH trigger with high quantity
+- Reused existing mock factories (`createDecisionMock`, `createBatchAnalysisMock`)
+- All 20 economics tests pass (6 preview + 5 batch-analysis + 4 execute/history + 5 market-signals)
+- No duplicated economic logic; tests verify endpoint behavior only
+- No signals drifting into recommendations — signals are environmental hints (slippage, liquidity, margin)
+- Files modified: economics-decision.test.ts, CURRENT_TASK.md, TASK_BACKLOG.md
+
+### 2026-04-26 - TASK-065
+
+Execute PROCESS_AND_SELL_LOCAL MVP — first strategy expansion beyond SELL_LOCAL:
+
+- Created atomic PostgreSQL RPC `execute_decision_process_and_sell_local` in migration `0018_execute_decision_process_and_sell_local.sql`
+- RPC: validates output resource tradable → locks input inventory → deducts input → computes output gross/fee/net → credits player → creates market order for output → writes market_sell + market_fee ledger entries → writes decision_log with PROCESS_AND_SELL_LOCAL strategy — all in one transaction
+- Service layer looks up recipe from `starterTransformRecipes` (shared package), computes batches and output quantities, passes derived values to RPC
+- Extended `DecisionExecutionResult` interface with optional `outputResourceId`, `inputConsumed`, `outputProduced` fields
+- Frontend: PROCESS_AND_SELL_LOCAL now shows Execute button (same Prepare → Confirm → Execute flow as SELL_LOCAL); execution result shows processing details (input consumed → output produced)
+- Added EN/FR i18n key `decisionProcessedLabel`
+- TRANSPORT_AND_SELL and PROCESS_THEN_TRANSPORT_AND_SELL remain "Preview only" (recorded as pending)
+- Added 4 new integration tests: PROCESS_AND_SELL_LOCAL execution with RPC verification, quantity-below-threshold validation (400), TRANSPORT_AND_SELL recorded, PROCESS_THEN_TRANSPORT_AND_SELL recorded, history with mixed strategy entries
+- All 24 economics tests pass (6 preview + 5 batch-analysis + 5 market-signals + 8 execute/history), 287 API tests total, 495 across workspace
+- TypeScript typecheck clean, build clean, i18n aligned
+- No duplicated economic logic — reuses `starterTransformRecipes` from shared package; execution uses base_price consistent with SELL_LOCAL pattern
+- Files modified: 0018 migration (new), economics.service.ts, economics.routes.ts, dashboard-api.ts, EconomicDecisionPanel.tsx, en/common.json, fr/common.json, economics-decision.test.ts

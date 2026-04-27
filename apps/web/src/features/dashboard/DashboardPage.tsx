@@ -34,6 +34,9 @@ import {
 import { previewMarketSnapshot } from './dashboard-preview';
 import { getBestEconomicMoves } from './best-economic-moves';
 import type { BestEconomicMove } from './best-economic-moves';
+import { EconomicDecisionPanel } from './EconomicDecisionPanel';
+import { VipAnalysisPanel } from './VipAnalysisPanel';
+import { MarketSignalPanel } from './MarketSignalPanel';
 import { getRegionalOpportunities } from './regional-opportunities';
 import type { RegionalOpportunity } from './regional-opportunities';
 import {
@@ -79,8 +82,12 @@ export function DashboardPage() {
       placeFirstExtractor({ accessToken: accessToken!, buildingTypeId }),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['dashboard', session?.user.id] }),
-        queryClient.invalidateQueries({ queryKey: ['starter-tutorial', session?.user.id] }),
+        queryClient.invalidateQueries({
+          queryKey: ['dashboard', session?.user.id],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['starter-tutorial', session?.user.id],
+        }),
       ]);
     },
   });
@@ -88,8 +95,12 @@ export function DashboardPage() {
     mutationFn: (buildingId: string) =>
       claimExtractorProduction({ accessToken: accessToken!, buildingId }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['dashboard', session?.user.id] });
-      await queryClient.invalidateQueries({ queryKey: ['starter-tutorial', session?.user.id] });
+      await queryClient.invalidateQueries({
+        queryKey: ['dashboard', session?.user.id],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ['starter-tutorial', session?.user.id],
+      });
     },
   });
   const placeProcessingMutation = useMutation({
@@ -99,46 +110,70 @@ export function DashboardPage() {
         buildingTypeId,
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['dashboard', session?.user.id] });
+      await queryClient.invalidateQueries({
+        queryKey: ['dashboard', session?.user.id],
+      });
     },
   });
   const startTransformMutation = useMutation({
     mutationFn: (input: { buildingId: string; recipeId: string }) =>
-      startTransformJob({ accessToken: accessToken!, buildingId: input.buildingId, recipeId: input.recipeId }),
+      startTransformJob({
+        accessToken: accessToken!,
+        buildingId: input.buildingId,
+        recipeId: input.recipeId,
+      }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['dashboard', session?.user.id] });
+      await queryClient.invalidateQueries({
+        queryKey: ['dashboard', session?.user.id],
+      });
     },
   });
   const claimTransformMutation = useMutation({
     mutationFn: (jobId: string) =>
       claimTransformJob({ accessToken: accessToken!, jobId }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['dashboard', session?.user.id] });
+      await queryClient.invalidateQueries({
+        queryKey: ['dashboard', session?.user.id],
+      });
     },
   });
 
   useEffect(() => {
     if (!dashboardQuery.isSuccess) return;
-    void queryClient.invalidateQueries({ queryKey: ['starter-tutorial', session?.user.id] });
-  }, [dashboardQuery.dataUpdatedAt, dashboardQuery.isSuccess, queryClient, session?.user.id]);
+    void queryClient.invalidateQueries({
+      queryKey: ['starter-tutorial', session?.user.id],
+    });
+  }, [
+    dashboardQuery.dataUpdatedAt,
+    dashboardQuery.isSuccess,
+    queryClient,
+    session?.user.id,
+  ]);
 
   /* ── Gameplay loop state ────────────────────────────────────────── */
   const [marketRefreshCycle, setMarketRefreshCycle] = useState(() =>
     restoreMarketPreviewRefreshCycle(window.localStorage),
   );
-  const [tradeSimState, setTradeSimState] = useState<RegionalTradeSimulationState>(() =>
-    restoreRegionalTradeSimulationState(window.localStorage),
-  );
-  const [selectedOpportunity, setSelectedOpportunity] = useState<RegionalOpportunity | null>(null);
-  const [regionalTradeDraft, setRegionalTradeDraft] = useState<RegionalTradeDraft | null>(null);
-  const [latestSimulation, setLatestSimulation] = useState<RegionalTradeSimulationResult | null>(null);
+  const [tradeSimState, setTradeSimState] =
+    useState<RegionalTradeSimulationState>(() =>
+      restoreRegionalTradeSimulationState(window.localStorage),
+    );
+  const [selectedOpportunity, setSelectedOpportunity] =
+    useState<RegionalOpportunity | null>(null);
+  const [regionalTradeDraft, setRegionalTradeDraft] =
+    useState<RegionalTradeDraft | null>(null);
+  const [latestSimulation, setLatestSimulation] =
+    useState<RegionalTradeSimulationResult | null>(null);
   const [simulationError, setSimulationError] = useState<string | null>(null);
   const [commitPhase, setCommitPhase] = useState<CommitPhase>('idle');
   const [commitResult, setCommitResult] = useState<CommitResult | null>(null);
   const [capitalPulseKey, setCapitalPulseKey] = useState(0);
 
   /* ── Derived market data ────────────────────────────────────────── */
-  const refreshedMarket = getRefreshedPreviewMarketSnapshot(previewMarketSnapshot, marketRefreshCycle);
+  const refreshedMarket = getRefreshedPreviewMarketSnapshot(
+    previewMarketSnapshot,
+    marketRefreshCycle,
+  );
   const marketSnapshot = refreshedMarket.snapshot;
   const bestMoves = getBestEconomicMoves(marketSnapshot);
   const regionalOpportunities = getRegionalOpportunities(marketSnapshot);
@@ -251,14 +286,23 @@ export function DashboardPage() {
 
     setTradeSimState((prev) => ({
       capital: resolution.capitalAfter,
-      recentSimulations: pushRegionalTradeSimulationHistory(prev.recentSimulations, resolution.result),
+      recentSimulations: pushRegionalTradeSimulationHistory(
+        prev.recentSimulations,
+        resolution.result,
+      ),
     }));
     setLatestSimulation(resolution.result);
     setCommitResult(result);
     setCommitPhase('committed');
     setSimulationError(null);
     setCapitalPulseKey((k) => k + 1);
-  }, [regionalTradeDraft, tradeSimState.capital, commitPhase, t, formatCurrency]);
+  }, [
+    regionalTradeDraft,
+    tradeSimState.capital,
+    commitPhase,
+    t,
+    formatCurrency,
+  ]);
 
   const handleOpenBestMove = useCallback(
     (move: BestEconomicMove) => {
@@ -277,20 +321,30 @@ export function DashboardPage() {
 
   /* ── Auth / loading guards ──────────────────────────────────────── */
   if (isAuthLoading) {
-    return <div className="pb-16 text-sm text-slate-300 md:pb-0">{t('dashboard.authLoading')}</div>;
+    return (
+      <div className="pb-16 text-sm text-slate-300 md:pb-0">
+        {t('dashboard.authLoading')}
+      </div>
+    );
   }
   if (!session) {
     return (
       <div className="space-y-4 pb-16 md:pb-0">
         <h2 className="text-2xl font-bold">{t('dashboard.title')}</h2>
         <PageCard>
-          <div className="text-sm text-slate-300">{t('dashboard.signInRequired')}</div>
+          <div className="text-sm text-slate-300">
+            {t('dashboard.signInRequired')}
+          </div>
         </PageCard>
       </div>
     );
   }
   if (dashboardQuery.isLoading) {
-    return <div className="pb-16 text-sm text-slate-300 md:pb-0">{t('dashboard.loading')}</div>;
+    return (
+      <div className="pb-16 text-sm text-slate-300 md:pb-0">
+        {t('dashboard.loading')}
+      </div>
+    );
   }
   if (dashboardQuery.isError) {
     return (
@@ -309,7 +363,9 @@ export function DashboardPage() {
         <h2 className="text-2xl font-bold">{t('dashboard.title')}</h2>
         <PageCard>
           <div className="space-y-3">
-            <div className="text-sm text-slate-300">{t('dashboard.bootstrapRequired')}</div>
+            <div className="text-sm text-slate-300">
+              {t('dashboard.bootstrapRequired')}
+            </div>
             <Link
               to="/onboarding"
               className="inline-flex rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950"
@@ -333,7 +389,10 @@ export function DashboardPage() {
   const transformRecipes = snapshot!.transformRecipes;
   const ledger = snapshot!.ledger;
   const news = snapshot!.news;
-  const inventoryTotal = inventory.reduce((sum, entry) => sum + entry.quantity, 0);
+  const inventoryTotal = inventory.reduce(
+    (sum, entry) => sum + entry.quantity,
+    0,
+  );
   const nextActionCue = getDashboardNextActionCue(snapshot);
   const starterProgressSummary = getDashboardStarterProgressSummary(snapshot);
 
@@ -353,13 +412,17 @@ export function DashboardPage() {
           </div>
         </PageCard>
         <PageCard>
-          <div className="text-sm text-slate-400">{t('dashboard.inventoryTotal')}</div>
+          <div className="text-sm text-slate-400">
+            {t('dashboard.inventoryTotal')}
+          </div>
           <div className="mt-2 text-2xl font-semibold text-slate-50">
             {formatNumber(inventoryTotal)}
           </div>
         </PageCard>
         <PageCard>
-          <div className="text-sm text-slate-400">{t('dashboard.production')}</div>
+          <div className="text-sm text-slate-400">
+            {t('dashboard.production')}
+          </div>
           <div className="mt-2 text-sm text-slate-200">
             {extractor
               ? formatNumber(extractor.outputPerHour)
@@ -373,8 +436,12 @@ export function DashboardPage() {
           <div className="text-xs font-medium uppercase tracking-wider text-amber-400">
             {t('dashboard.nextActionTitle')}
           </div>
-          <div className="mt-2 text-base font-semibold text-slate-50">{t(nextActionCue.titleKey)}</div>
-          <div className="mt-1 text-sm text-slate-300">{t(nextActionCue.bodyKey)}</div>
+          <div className="mt-2 text-base font-semibold text-slate-50">
+            {t(nextActionCue.titleKey)}
+          </div>
+          <div className="mt-1 text-sm text-slate-300">
+            {t(nextActionCue.bodyKey)}
+          </div>
         </PageCard>
       ) : null}
 
@@ -386,7 +453,9 @@ export function DashboardPage() {
           <div className="mt-2 text-base font-semibold text-slate-50">
             {t(starterProgressSummary.titleKey)}
           </div>
-          <div className="mt-1 text-sm text-slate-300">{t(starterProgressSummary.bodyKey)}</div>
+          <div className="mt-1 text-sm text-slate-300">
+            {t(starterProgressSummary.bodyKey)}
+          </div>
         </PageCard>
       ) : null}
 
@@ -395,7 +464,9 @@ export function DashboardPage() {
         <PageCard>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="text-sm text-slate-400">{t('dashboard.extractorTitle')}</div>
+              <div className="text-sm text-slate-400">
+                {t('dashboard.extractorTitle')}
+              </div>
               {extractor ? (
                 <>
                   <div className="mt-2 text-xl font-semibold text-slate-50">
@@ -403,7 +474,9 @@ export function DashboardPage() {
                   </div>
                   <div className="mt-1 text-sm text-slate-300">
                     {t('dashboard.extractorOutput', {
-                      resource: t(`resources.${extractor.outputResourceId}.name`),
+                      resource: t(
+                        `resources.${extractor.outputResourceId}.name`,
+                      ),
                       amount: formatNumber(extractor.outputPerHour),
                     })}
                   </div>
@@ -411,14 +484,20 @@ export function DashboardPage() {
                     {extractor.readyToClaim
                       ? t('dashboard.claimReady', {
                           amount: formatNumber(extractor.claimableQuantity),
-                          resource: t(`resources.${extractor.outputResourceId}.name`),
+                          resource: t(
+                            `resources.${extractor.outputResourceId}.name`,
+                          ),
                         })
-                      : t('dashboard.nextClaimAt', { date: formatDate(extractor.nextClaimAt) })}
+                      : t('dashboard.nextClaimAt', {
+                          date: formatDate(extractor.nextClaimAt),
+                        })}
                   </div>
                 </>
               ) : (
                 <div className="mt-2 space-y-3">
-                  <div className="text-sm text-slate-300">{t('dashboard.noExtractor')}</div>
+                  <div className="text-sm text-slate-300">
+                    {t('dashboard.noExtractor')}
+                  </div>
                   {starterExtractor ? (
                     <button
                       type="button"
@@ -428,7 +507,11 @@ export function DashboardPage() {
                     >
                       {placeMutation.isPending
                         ? t('dashboard.placingExtractor')
-                        : t('dashboard.placeExtractorAction', { extractor: t(`buildingTypes.${starterExtractor.id}.name`) })}
+                        : t('dashboard.placeExtractorAction', {
+                            extractor: t(
+                              `buildingTypes.${starterExtractor.id}.name`,
+                            ),
+                          })}
                     </button>
                   ) : null}
                 </div>
@@ -441,16 +524,22 @@ export function DashboardPage() {
                 disabled={!extractor.readyToClaim || claimMutation.isPending}
                 className="rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
               >
-                {claimMutation.isPending ? t('dashboard.claiming') : t('dashboard.claimAction')}
+                {claimMutation.isPending
+                  ? t('dashboard.claiming')
+                  : t('dashboard.claimAction')}
               </button>
             ) : null}
           </div>
           <div className="mt-4 border-t border-slate-800 pt-4">
-            <div className="text-sm text-slate-400">{t('dashboard.processingInstallationTitle')}</div>
+            <div className="text-sm text-slate-400">
+              {t('dashboard.processingInstallationTitle')}
+            </div>
             {processingInstallation ? (
               <div className="mt-2 space-y-1">
                 <div className="text-base font-semibold text-slate-50">
-                  {t(`buildingTypes.${processingInstallation.buildingTypeId}.name`)}
+                  {t(
+                    `buildingTypes.${processingInstallation.buildingTypeId}.name`,
+                  )}
                 </div>
                 <div className="text-sm text-slate-300">
                   {t('dashboard.processingInstallationOnline')}
@@ -467,7 +556,9 @@ export function DashboardPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      placeProcessingMutation.mutate(starterProcessingInstallation.id)
+                      placeProcessingMutation.mutate(
+                        starterProcessingInstallation.id,
+                      )
                     }
                     disabled={!extractor || placeProcessingMutation.isPending}
                     className="rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
@@ -485,10 +576,14 @@ export function DashboardPage() {
             )}
           </div>
           {claimMutation.isError ? (
-            <div className="mt-3 text-sm text-rose-300">{t(getGameplayErrorKey(claimMutation.error.message))}</div>
+            <div className="mt-3 text-sm text-rose-300">
+              {t(getGameplayErrorKey(claimMutation.error.message))}
+            </div>
           ) : null}
           {placeMutation.isError ? (
-            <div className="mt-3 text-sm text-rose-300">{t(getGameplayErrorKey(placeMutation.error.message))}</div>
+            <div className="mt-3 text-sm text-rose-300">
+              {t(getGameplayErrorKey(placeMutation.error.message))}
+            </div>
           ) : null}
           {placeProcessingMutation.isError ? (
             <div className="mt-3 text-sm text-rose-300">
@@ -499,7 +594,9 @@ export function DashboardPage() {
 
         {/* ── Inventory section ─────────────────────────────────────── */}
         <PageCard>
-          <div className="text-sm text-slate-400">{t('dashboard.inventoryTitle')}</div>
+          <div className="text-sm text-slate-400">
+            {t('dashboard.inventoryTitle')}
+          </div>
           {inventory.length > 0 ? (
             <div className="mt-3 space-y-3">
               {inventory.map((entry) => (
@@ -507,34 +604,53 @@ export function DashboardPage() {
                   key={entry.resourceId}
                   className="flex items-center justify-between rounded-xl border border-slate-800 px-3 py-2"
                 >
-                  <div className="text-sm text-slate-200">{t(`resources.${entry.resourceId}.name`)}</div>
-                  <div className="text-sm font-semibold text-slate-50">{formatNumber(entry.quantity)}</div>
+                  <div className="text-sm text-slate-200">
+                    {t(`resources.${entry.resourceId}.name`)}
+                  </div>
+                  <div className="text-sm font-semibold text-slate-50">
+                    {formatNumber(entry.quantity)}
+                  </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="mt-3 text-sm text-slate-300">{t('dashboard.emptyInventory')}</div>
+            <div className="mt-3 text-sm text-slate-300">
+              {t('dashboard.emptyInventory')}
+            </div>
           )}
         </PageCard>
       </div>
 
       {/* ── Transform section ───────────────────────────────────────── */}
       <PageCard>
-        <div className="text-sm text-slate-400">{t('dashboard.transformTitle')}</div>
+        <div className="text-sm text-slate-400">
+          {t('dashboard.transformTitle')}
+        </div>
         {transformRecipes.length > 0 ? (
           <div className="mt-3 space-y-4">
             {transformRecipes.map((recipe) => (
-              <div key={recipe.recipeId} className="rounded-2xl border border-slate-800 px-4 py-4">
+              <div
+                key={recipe.recipeId}
+                className="rounded-2xl border border-slate-800 px-4 py-4"
+              >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="space-y-2">
-                    <div className="text-base font-semibold text-slate-50">{t(recipe.nameKey)}</div>
-                    <div className="text-sm text-slate-300">{t(recipe.descriptionKey)}</div>
+                    <div className="text-base font-semibold text-slate-50">
+                      {t(recipe.nameKey)}
+                    </div>
+                    <div className="text-sm text-slate-300">
+                      {t(recipe.descriptionKey)}
+                    </div>
                     <div className="text-sm text-slate-200">
                       {t('dashboard.transformRecipeLine', {
                         inputAmount: formatNumber(recipe.inputAmount),
-                        inputResource: t(`resources.${recipe.inputResourceId}.name`),
+                        inputResource: t(
+                          `resources.${recipe.inputResourceId}.name`,
+                        ),
                         outputAmount: formatNumber(recipe.outputAmount),
-                        outputResource: t(`resources.${recipe.outputResourceId}.name`),
+                        outputResource: t(
+                          `resources.${recipe.outputResourceId}.name`,
+                        ),
                       })}
                     </div>
                     {recipe.activeJob ? (
@@ -542,21 +658,29 @@ export function DashboardPage() {
                         {recipe.activeJob.readyToClaim
                           ? t('dashboard.transformReadyToClaim', {
                               outputAmount: formatNumber(recipe.outputAmount),
-                              outputResource: t(`resources.${recipe.outputResourceId}.name`),
+                              outputResource: t(
+                                `resources.${recipe.outputResourceId}.name`,
+                              ),
                             })
-                          : t('dashboard.transformCompletesAt', { date: formatDate(recipe.activeJob.completesAt) })}
+                          : t('dashboard.transformCompletesAt', {
+                              date: formatDate(recipe.activeJob.completesAt),
+                            })}
                       </div>
                     ) : !processingInstallation ? (
                       <div className="text-sm text-slate-300">
                         {t('dashboard.transformProcessingInstallationRequired')}
                       </div>
                     ) : recipe.canStart ? (
-                      <div className="text-sm text-slate-300">{t('dashboard.transformReadyToStart')}</div>
+                      <div className="text-sm text-slate-300">
+                        {t('dashboard.transformReadyToStart')}
+                      </div>
                     ) : (
                       <div className="text-sm text-slate-300">
                         {t('dashboard.transformMissingInput', {
                           amount: formatNumber(recipe.missingInputAmount),
-                          resource: t(`resources.${recipe.inputResourceId}.name`),
+                          resource: t(
+                            `resources.${recipe.inputResourceId}.name`,
+                          ),
                         })}
                       </div>
                     )}
@@ -564,20 +688,38 @@ export function DashboardPage() {
                   {recipe.activeJob ? (
                     <button
                       type="button"
-                      onClick={() => claimTransformMutation.mutate(recipe.activeJob!.jobId)}
-                      disabled={!recipe.activeJob.readyToClaim || claimTransformMutation.isPending}
+                      onClick={() =>
+                        claimTransformMutation.mutate(recipe.activeJob!.jobId)
+                      }
+                      disabled={
+                        !recipe.activeJob.readyToClaim ||
+                        claimTransformMutation.isPending
+                      }
                       className="rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
                     >
-                      {claimTransformMutation.isPending ? t('dashboard.claimingTransform') : t('dashboard.claimTransformAction')}
+                      {claimTransformMutation.isPending
+                        ? t('dashboard.claimingTransform')
+                        : t('dashboard.claimTransformAction')}
                     </button>
                   ) : (
                     <button
                       type="button"
-                      onClick={() => startTransformMutation.mutate({ buildingId: recipe.buildingId, recipeId: recipe.recipeId })}
-                      disabled={!processingInstallation || !recipe.canStart || startTransformMutation.isPending}
+                      onClick={() =>
+                        startTransformMutation.mutate({
+                          buildingId: recipe.buildingId,
+                          recipeId: recipe.recipeId,
+                        })
+                      }
+                      disabled={
+                        !processingInstallation ||
+                        !recipe.canStart ||
+                        startTransformMutation.isPending
+                      }
                       className="rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
                     >
-                      {startTransformMutation.isPending ? t('dashboard.startingTransform') : t('dashboard.startTransformAction')}
+                      {startTransformMutation.isPending
+                        ? t('dashboard.startingTransform')
+                        : t('dashboard.startTransformAction')}
                     </button>
                   )}
                 </div>
@@ -585,15 +727,42 @@ export function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="mt-3 text-sm text-slate-300">{t('dashboard.emptyTransforms')}</div>
+          <div className="mt-3 text-sm text-slate-300">
+            {t('dashboard.emptyTransforms')}
+          </div>
         )}
         {startTransformMutation.isError ? (
-          <div className="mt-3 text-sm text-rose-300">{t(getGameplayErrorKey(startTransformMutation.error.message))}</div>
+          <div className="mt-3 text-sm text-rose-300">
+            {t(getGameplayErrorKey(startTransformMutation.error.message))}
+          </div>
         ) : null}
         {claimTransformMutation.isError ? (
-          <div className="mt-3 text-sm text-rose-300">{t(getGameplayErrorKey(claimTransformMutation.error.message))}</div>
+          <div className="mt-3 text-sm text-rose-300">
+            {t(getGameplayErrorKey(claimTransformMutation.error.message))}
+          </div>
         ) : null}
       </PageCard>
+
+      {/* ── Economic decision panel (TASK-058) ──────────────────────── */}
+      <EconomicDecisionPanel
+        accessToken={accessToken!}
+        inventory={inventory}
+        regionId={player.regionId!}
+      />
+
+      {/* ── VIP analysis panel (TASK-060) ─────────────────────────── */}
+      <VipAnalysisPanel
+        accessToken={accessToken!}
+        inventory={inventory}
+        regionId={player.regionId!}
+      />
+
+      {/* ── Market signal panel (TASK-061) ───────────────────────── */}
+      <MarketSignalPanel
+        accessToken={accessToken!}
+        inventory={inventory}
+        regionId={player.regionId!}
+      />
 
       {/* ═══════════════════════════════════════════════════════════════
           GAMEPLAY LOOP: SEE → DECIDE → SIMULATE → COMMIT → FEEDBACK
@@ -601,8 +770,12 @@ export function DashboardPage() {
 
       {/* ── Best economic moves (DECIDE layer) ──────────────────────── */}
       <PageCard>
-        <div className="text-sm text-slate-400">{t('dashboard.bestEconomicMovesTitle')}</div>
-        <div className="mt-1 text-xs text-slate-500">{t('dashboard.bestEconomicMovesSubtitle')}</div>
+        <div className="text-sm text-slate-400">
+          {t('dashboard.bestEconomicMovesTitle')}
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          {t('dashboard.bestEconomicMovesSubtitle')}
+        </div>
         {bestMoves.length > 0 ? (
           <div className="mt-3 space-y-3">
             {bestMoves.map((move) => (
@@ -617,27 +790,56 @@ export function DashboardPage() {
                     </span>
                     {move.category ? (
                       <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
-                        {t(`dashboard.marketRegionalOpportunityCategory.${move.category}`)}
+                        {t(
+                          `dashboard.marketRegionalOpportunityCategory.${move.category}`,
+                        )}
                       </span>
                     ) : null}
                   </div>
                   <div className="text-sm text-slate-200">
                     {move.type === 'regional_trade'
                       ? t('dashboard.bestEconomicMoveRegionalSummary', {
-                          resource: move.resourceId ? t(`resources.${move.resourceId}.name`) : '',
-                          buyLocation: move.buyContextKey ? t(`locations.${move.buyContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`) : '',
-                          sellLocation: move.sellContextKey ? t(`locations.${move.sellContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`) : '',
+                          resource: move.resourceId
+                            ? t(`resources.${move.resourceId}.name`)
+                            : '',
+                          buyLocation: move.buyContextKey
+                            ? t(
+                                `locations.${move.buyContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`,
+                              )
+                            : '',
+                          sellLocation: move.sellContextKey
+                            ? t(
+                                `locations.${move.sellContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`,
+                              )
+                            : '',
                         })
                       : t('dashboard.bestEconomicMoveTransformationSummary', {
-                          inputResource: move.inputResourceId ? t(`resources.${move.inputResourceId}.name`) : '',
-                          outputResource: move.outputResourceId ? t(`resources.${move.outputResourceId}.name`) : '',
-                          sellLocation: move.sellContextKey ? t(`locations.${move.sellContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`) : '',
+                          inputResource: move.inputResourceId
+                            ? t(`resources.${move.inputResourceId}.name`)
+                            : '',
+                          outputResource: move.outputResourceId
+                            ? t(`resources.${move.outputResourceId}.name`)
+                            : '',
+                          sellLocation: move.sellContextKey
+                            ? t(
+                                `locations.${move.sellContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`,
+                              )
+                            : '',
                         })}
                   </div>
                   <div className="flex gap-4 text-xs text-slate-400">
-                    <span>{t('dashboard.bestEconomicMovesCapital')}: {formatCurrency(move.capitalRequired)}</span>
-                    <span>{t('dashboard.bestEconomicMovesNet')}: {formatCurrency(move.estimatedNetProfit)}</span>
-                    <span>{t('dashboard.bestEconomicMovesEfficiency')}: {(move.efficiencyScore * 100).toFixed(0)}%</span>
+                    <span>
+                      {t('dashboard.bestEconomicMovesCapital')}:{' '}
+                      {formatCurrency(move.capitalRequired)}
+                    </span>
+                    <span>
+                      {t('dashboard.bestEconomicMovesNet')}:{' '}
+                      {formatCurrency(move.estimatedNetProfit)}
+                    </span>
+                    <span>
+                      {t('dashboard.bestEconomicMovesEfficiency')}:{' '}
+                      {(move.efficiencyScore * 100).toFixed(0)}%
+                    </span>
                   </div>
                 </div>
                 <button
@@ -651,7 +853,9 @@ export function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="mt-3 text-sm text-slate-300">{t('dashboard.bestEconomicMovesEmpty')}</div>
+          <div className="mt-3 text-sm text-slate-300">
+            {t('dashboard.bestEconomicMovesEmpty')}
+          </div>
         )}
       </PageCard>
 
@@ -659,8 +863,12 @@ export function DashboardPage() {
       <PageCard>
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm text-slate-400">{t('dashboard.marketRegionalOpportunityTitle')}</div>
-            <div className="mt-1 text-xs text-slate-500">{t('dashboard.marketRegionalOpportunitySubtitle')}</div>
+            <div className="text-sm text-slate-400">
+              {t('dashboard.marketRegionalOpportunityTitle')}
+            </div>
+            <div className="mt-1 text-xs text-slate-500">
+              {t('dashboard.marketRegionalOpportunitySubtitle')}
+            </div>
           </div>
           <div className="flex gap-2">
             <button
@@ -668,14 +876,19 @@ export function DashboardPage() {
               onClick={handleRefreshMarket}
               className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:border-slate-500"
             >
-              {t('dashboard.marketRefreshAction')} ({t('dashboard.marketRefreshHint', { cycle: marketRefreshCycle })})
+              {t('dashboard.marketRefreshAction')} (
+              {t('dashboard.marketRefreshHint', { cycle: marketRefreshCycle })})
             </button>
           </div>
         </div>
 
         {/* Simulated capital display */}
         <div className="mt-3 flex items-center gap-3 rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-3">
-          <div className="text-sm text-amber-300">{t('dashboard.marketRegionalCapitalLabel', { value: formatCurrency(tradeSimState.capital) })}</div>
+          <div className="text-sm text-amber-300">
+            {t('dashboard.marketRegionalCapitalLabel', {
+              value: formatCurrency(tradeSimState.capital),
+            })}
+          </div>
           <button
             type="button"
             onClick={handleResetCapital}
@@ -687,35 +900,68 @@ export function DashboardPage() {
 
         {/* Session goals */}
         <div className="mt-3 rounded-xl border border-slate-800 px-4 py-3">
-          <div className="text-xs font-medium uppercase tracking-wider text-slate-400">{t('dashboard.marketRegionalSessionTitle')}</div>
+          <div className="text-xs font-medium uppercase tracking-wider text-slate-400">
+            {t('dashboard.marketRegionalSessionTitle')}
+          </div>
           <div className="mt-2 space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-300">{t('dashboard.marketRegionalSessionCapitalTitle')}</span>
-              <span className={sessionProgress.capital.completed ? 'text-emerald-400' : 'text-slate-200'}>
-                {formatCurrency(sessionProgress.capital.current)} / {formatCurrency(sessionProgress.capital.target)}
+              <span className="text-slate-300">
+                {t('dashboard.marketRegionalSessionCapitalTitle')}
+              </span>
+              <span
+                className={
+                  sessionProgress.capital.completed
+                    ? 'text-emerald-400'
+                    : 'text-slate-200'
+                }
+              >
+                {formatCurrency(sessionProgress.capital.current)} /{' '}
+                {formatCurrency(sessionProgress.capital.target)}
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-slate-800">
               <div
                 className={`h-full rounded-full transition-all ${sessionProgress.capital.completed ? 'bg-emerald-400' : 'bg-amber-400'}`}
-                style={{ width: `${Math.min(100, sessionProgress.capital.progress * 100)}%` }}
+                style={{
+                  width: `${Math.min(100, sessionProgress.capital.progress * 100)}%`,
+                }}
               />
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-300">{t('dashboard.marketRegionalSessionTradesTitle')}</span>
-              <span className={sessionProgress.profitableTrades.completed ? 'text-emerald-400' : 'text-slate-200'}>
-                {sessionProgress.profitableTrades.current} / {sessionProgress.profitableTrades.target}
+              <span className="text-slate-300">
+                {t('dashboard.marketRegionalSessionTradesTitle')}
+              </span>
+              <span
+                className={
+                  sessionProgress.profitableTrades.completed
+                    ? 'text-emerald-400'
+                    : 'text-slate-200'
+                }
+              >
+                {sessionProgress.profitableTrades.current} /{' '}
+                {sessionProgress.profitableTrades.target}
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-300">{t('dashboard.marketRegionalSessionProfitTitle')}</span>
-              <span className={sessionProgress.cumulativeProfit.completed ? 'text-emerald-400' : 'text-slate-200'}>
-                {formatCurrency(sessionProgress.cumulativeProfit.current)} / {formatCurrency(sessionProgress.cumulativeProfit.target)}
+              <span className="text-slate-300">
+                {t('dashboard.marketRegionalSessionProfitTitle')}
+              </span>
+              <span
+                className={
+                  sessionProgress.cumulativeProfit.completed
+                    ? 'text-emerald-400'
+                    : 'text-slate-200'
+                }
+              >
+                {formatCurrency(sessionProgress.cumulativeProfit.current)} /{' '}
+                {formatCurrency(sessionProgress.cumulativeProfit.target)}
               </span>
             </div>
           </div>
           {sessionProgress.isCompleted ? (
-            <div className="mt-2 text-sm text-emerald-400">{t('dashboard.marketRegionalSessionCompleted')}</div>
+            <div className="mt-2 text-sm text-emerald-400">
+              {t('dashboard.marketRegionalSessionCompleted')}
+            </div>
           ) : null}
         </div>
 
@@ -734,20 +980,38 @@ export function DashboardPage() {
                         {t(`resources.${opp.resourceId}.name`)}
                       </span>
                       <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
-                        {t(`dashboard.marketRegionalOpportunityCategory.${opp.category}`)}
+                        {t(
+                          `dashboard.marketRegionalOpportunityCategory.${opp.category}`,
+                        )}
                       </span>
                     </div>
                     <div className="text-xs text-slate-400">
                       {t('dashboard.marketRegionalOpportunityAction', {
                         resource: t(`resources.${opp.resourceId}.name`),
-                        buyLocation: t(`locations.${opp.buyContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`),
-                        sellLocation: t(`locations.${opp.sellContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`),
+                        buyLocation: t(
+                          `locations.${opp.buyContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`,
+                        ),
+                        sellLocation: t(
+                          `locations.${opp.sellContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`,
+                        ),
                       })}
                     </div>
                     <div className="flex gap-4 text-xs text-slate-400">
-                      <span>{t('dashboard.marketRegionalOpportunitySpread')}: {formatCurrency(opp.spreadPerUnit)}</span>
-                      <span>{t('dashboard.marketRegionalOpportunityNet')}: {formatCurrency(opp.netSpreadPerUnit)}</span>
-                      <span>{t('dashboard.marketRegionalOpportunityValue', { value: formatCurrency(opp.estimatedNetOpportunityValue) })}</span>
+                      <span>
+                        {t('dashboard.marketRegionalOpportunitySpread')}:{' '}
+                        {formatCurrency(opp.spreadPerUnit)}
+                      </span>
+                      <span>
+                        {t('dashboard.marketRegionalOpportunityNet')}:{' '}
+                        {formatCurrency(opp.netSpreadPerUnit)}
+                      </span>
+                      <span>
+                        {t('dashboard.marketRegionalOpportunityValue', {
+                          value: formatCurrency(
+                            opp.estimatedNetOpportunityValue,
+                          ),
+                        })}
+                      </span>
                     </div>
                   </div>
                   <button
@@ -762,7 +1026,9 @@ export function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="mt-3 text-sm text-slate-300">{t('dashboard.bestEconomicMovesEmpty')}</div>
+          <div className="mt-3 text-sm text-slate-300">
+            {t('dashboard.bestEconomicMovesEmpty')}
+          </div>
         )}
       </PageCard>
 
@@ -770,7 +1036,9 @@ export function DashboardPage() {
       {regionalTradeDraft ? (
         <PageCard>
           <div className="flex items-center justify-between">
-            <div className="text-sm text-slate-400">{t('dashboard.marketRegionalDraftTitle')}</div>
+            <div className="text-sm text-slate-400">
+              {t('dashboard.marketRegionalDraftTitle')}
+            </div>
             <button
               type="button"
               onClick={handleCloseDraft}
@@ -782,7 +1050,9 @@ export function DashboardPage() {
 
           {/* Draft details */}
           <div className="mt-3 space-y-2 rounded-xl border border-slate-800 px-4 py-3">
-            <div className="text-xs text-slate-500">{t('dashboard.marketRegionalDraftSimulation')}</div>
+            <div className="text-xs text-slate-500">
+              {t('dashboard.marketRegionalDraftSimulation')}
+            </div>
             <div className="flex items-center gap-3 text-sm text-slate-200">
               <span>{t('dashboard.marketRegionalDraftQuantity')}:</span>
               <input
@@ -790,27 +1060,51 @@ export function DashboardPage() {
                 min={1}
                 max={regionalTradeDraft.estimatedTradableUnits}
                 value={regionalTradeDraft.quantity}
-                onChange={(e) => handleDraftQuantityChange(Number(e.target.value))}
+                onChange={(e) =>
+                  handleDraftQuantityChange(Number(e.target.value))
+                }
                 className="w-20 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-200"
               />
               <span className="text-xs text-slate-500">
-                {t('dashboard.marketRegionalDraftCapacity', { quantity: regionalTradeDraft.estimatedTradableUnits })}
+                {t('dashboard.marketRegionalDraftCapacity', {
+                  quantity: regionalTradeDraft.estimatedTradableUnits,
+                })}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="text-slate-400">{t('dashboard.marketRegionalDraftPurchaseCost')}</div>
-              <div className="text-right text-slate-200">{formatCurrency(regionalTradeDraft.estimatedPurchaseCost)}</div>
-              <div className="text-slate-400">{t('dashboard.marketRegionalDraftTransferCost')}</div>
-              <div className="text-right text-slate-200">{formatCurrency(regionalTradeDraft.estimatedTransferCost)}</div>
-              <div className="text-slate-400">{t('dashboard.marketRegionalDraftRevenue')}</div>
-              <div className="text-right text-slate-200">{formatCurrency(regionalTradeDraft.estimatedRevenue)}</div>
-              <div className="text-slate-400">{t('dashboard.marketRegionalDraftNetProfit')}</div>
-              <div className={`text-right font-semibold ${regionalTradeDraft.estimatedNetProfit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <div className="text-slate-400">
+                {t('dashboard.marketRegionalDraftPurchaseCost')}
+              </div>
+              <div className="text-right text-slate-200">
+                {formatCurrency(regionalTradeDraft.estimatedPurchaseCost)}
+              </div>
+              <div className="text-slate-400">
+                {t('dashboard.marketRegionalDraftTransferCost')}
+              </div>
+              <div className="text-right text-slate-200">
+                {formatCurrency(regionalTradeDraft.estimatedTransferCost)}
+              </div>
+              <div className="text-slate-400">
+                {t('dashboard.marketRegionalDraftRevenue')}
+              </div>
+              <div className="text-right text-slate-200">
+                {formatCurrency(regionalTradeDraft.estimatedRevenue)}
+              </div>
+              <div className="text-slate-400">
+                {t('dashboard.marketRegionalDraftNetProfit')}
+              </div>
+              <div
+                className={`text-right font-semibold ${regionalTradeDraft.estimatedNetProfit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+              >
                 {formatCurrency(regionalTradeDraft.estimatedNetProfit)}
               </div>
             </div>
             <div className="text-xs text-slate-500">
-              {t('dashboard.marketRegionalCapitalRequired', { value: formatCurrency(getRegionalTradeRequiredCapital(regionalTradeDraft)) })}
+              {t('dashboard.marketRegionalCapitalRequired', {
+                value: formatCurrency(
+                  getRegionalTradeRequiredCapital(regionalTradeDraft),
+                ),
+              })}
             </div>
           </div>
 
@@ -858,19 +1152,32 @@ export function DashboardPage() {
                 <div className="mt-2 text-sm text-slate-300">
                   {t('dashboard.marketRegionalSimulationResultSummary', {
                     quantity: formatNumber(latestSimulation.quantity),
-                    resource: t(`resources.${latestSimulation.resourceId}.name`),
-                    buyLocation: t(`locations.${latestSimulation.buyContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`),
-                    sellLocation: t(`locations.${latestSimulation.sellContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`),
+                    resource: t(
+                      `resources.${latestSimulation.resourceId}.name`,
+                    ),
+                    buyLocation: t(
+                      `locations.${latestSimulation.buyContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`,
+                    ),
+                    sellLocation: t(
+                      `locations.${latestSimulation.sellContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`,
+                    ),
                   })}
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                  <div className="text-slate-400">{t('dashboard.simulationNetProfitLabel')}</div>
-                  <div className={`text-right font-semibold ${latestSimulation.estimatedNetProfit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  <div className="text-slate-400">
+                    {t('dashboard.simulationNetProfitLabel')}
+                  </div>
+                  <div
+                    className={`text-right font-semibold ${latestSimulation.estimatedNetProfit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+                  >
                     {formatCurrency(latestSimulation.estimatedNetProfit)}
                   </div>
-                  <div className="text-slate-400">{t('dashboard.simulationCapitalChangeLabel')}</div>
+                  <div className="text-slate-400">
+                    {t('dashboard.simulationCapitalChangeLabel')}
+                  </div>
                   <div className="text-right text-slate-200">
-                    {formatCurrency(latestSimulation.capitalBefore)} → {formatCurrency(latestSimulation.capitalAfter)}
+                    {formatCurrency(latestSimulation.capitalBefore)} →{' '}
+                    {formatCurrency(latestSimulation.capitalAfter)}
                   </div>
                 </div>
               </div>
@@ -895,15 +1202,21 @@ export function DashboardPage() {
                     {t('dashboard.commitBadge')}
                   </span>
                 </div>
-                <div className="mt-1 text-sm text-amber-200/70">{t('dashboard.commitResultSubtitle')}</div>
+                <div className="mt-1 text-sm text-amber-200/70">
+                  {t('dashboard.commitResultSubtitle')}
+                </div>
 
                 {/* Summary */}
                 <div className="mt-3 text-sm text-slate-200">
                   {t('dashboard.commitResultSummary', {
                     quantity: formatNumber(commitResult.quantity),
                     resource: t(`resources.${commitResult.resourceId}.name`),
-                    buyLocation: t(`locations.${commitResult.buyContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`),
-                    sellLocation: t(`locations.${commitResult.sellContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`),
+                    buyLocation: t(
+                      `locations.${commitResult.buyContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`,
+                    ),
+                    sellLocation: t(
+                      `locations.${commitResult.sellContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`,
+                    ),
                   })}
                 </div>
 
@@ -912,25 +1225,38 @@ export function DashboardPage() {
                   <div className="text-xs font-medium uppercase tracking-wider text-amber-300">
                     {t('dashboard.commitNetProfitLabel')}
                   </div>
-                  <div className={`animate-commit-profit-pop mt-1 text-2xl font-bold ${commitResult.netProfit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {commitResult.netProfit > 0 ? '+' : ''}{formatCurrency(commitResult.netProfit)}
+                  <div
+                    className={`animate-commit-profit-pop mt-1 text-2xl font-bold ${commitResult.netProfit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+                  >
+                    {commitResult.netProfit > 0 ? '+' : ''}
+                    {formatCurrency(commitResult.netProfit)}
                   </div>
                 </div>
 
                 {/* Capital before → after */}
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-slate-800 px-3 py-2">
-                    <div className="text-xs uppercase tracking-wider text-slate-500">{t('dashboard.commitCapitalBeforeLabel')}</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-300">{formatCurrency(commitResult.capitalBefore)}</div>
+                    <div className="text-xs uppercase tracking-wider text-slate-500">
+                      {t('dashboard.commitCapitalBeforeLabel')}
+                    </div>
+                    <div className="mt-1 text-lg font-semibold text-slate-300">
+                      {formatCurrency(commitResult.capitalBefore)}
+                    </div>
                   </div>
                   <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2">
-                    <div className="text-xs uppercase tracking-wider text-amber-300">{t('dashboard.commitCapitalAfterLabel')}</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-50">{formatCurrency(commitResult.capitalAfter)}</div>
+                    <div className="text-xs uppercase tracking-wider text-amber-300">
+                      {t('dashboard.commitCapitalAfterLabel')}
+                    </div>
+                    <div className="mt-1 text-lg font-semibold text-slate-50">
+                      {formatCurrency(commitResult.capitalAfter)}
+                    </div>
                   </div>
                 </div>
 
                 {/* Continue hint */}
-                <div className="mt-3 text-sm text-slate-400">{t('dashboard.commitContinueHint')}</div>
+                <div className="mt-3 text-sm text-slate-400">
+                  {t('dashboard.commitContinueHint')}
+                </div>
               </div>
             </div>
           ) : null}
@@ -940,8 +1266,12 @@ export function DashboardPage() {
       {/* ── Recent simulations / activity feed ──────────────────────── */}
       {tradeSimState.recentSimulations.length > 0 ? (
         <PageCard>
-          <div className="text-sm text-slate-400">{t('dashboard.marketRegionalHistoryTitle')}</div>
-          <div className="mt-1 text-xs text-slate-500">{t('dashboard.marketRegionalHistoryLimit')}</div>
+          <div className="text-sm text-slate-400">
+            {t('dashboard.marketRegionalHistoryTitle')}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            {t('dashboard.marketRegionalHistoryLimit')}
+          </div>
           <div className="mt-3 space-y-3">
             {tradeSimState.recentSimulations.map((sim) => (
               <div
@@ -958,7 +1288,8 @@ export function DashboardPage() {
                       <span className="text-sm font-medium text-slate-50">
                         {t(`resources.${sim.resourceId}.name`)}
                       </span>
-                      {commitResult && commitResult.id === `commit-${sim.id}` ? (
+                      {commitResult &&
+                      commitResult.id === `commit-${sim.id}` ? (
                         <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-amber-400">
                           {t('dashboard.commitLedgerBadge')}
                         </span>
@@ -966,18 +1297,27 @@ export function DashboardPage() {
                     </div>
                     <div className="mt-1 text-xs text-slate-400">
                       {t('dashboard.marketRegionalHistoryRoute', {
-                        buyLocation: t(`locations.${sim.buyContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`),
-                        sellLocation: t(`locations.${sim.sellContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`),
+                        buyLocation: t(
+                          `locations.${sim.buyContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`,
+                        ),
+                        sellLocation: t(
+                          `locations.${sim.sellContextKey === 'region_anchor' ? 'primary_storage' : 'remote_storage'}.name`,
+                        ),
                         quantity: formatNumber(sim.quantity),
                       })}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className={`text-sm font-semibold ${sim.estimatedNetProfit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {sim.estimatedNetProfit > 0 ? '+' : ''}{formatCurrency(sim.estimatedNetProfit)}
+                    <div
+                      className={`text-sm font-semibold ${sim.estimatedNetProfit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+                    >
+                      {sim.estimatedNetProfit > 0 ? '+' : ''}
+                      {formatCurrency(sim.estimatedNetProfit)}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {t('dashboard.marketRegionalHistoryCapitalAfter', { value: formatCurrency(sim.capitalAfter) })}
+                      {t('dashboard.marketRegionalHistoryCapitalAfter', {
+                        value: formatCurrency(sim.capitalAfter),
+                      })}
                     </div>
                   </div>
                 </div>
@@ -989,7 +1329,9 @@ export function DashboardPage() {
 
       {/* ── Ledger section ───────────────────────────────────────────── */}
       <PageCard>
-        <div className="text-sm text-slate-400">{t('dashboard.ledgerTitle')}</div>
+        <div className="text-sm text-slate-400">
+          {t('dashboard.ledgerTitle')}
+        </div>
         {ledger.length > 0 ? (
           <div className="mt-3 space-y-3">
             {ledger.map((entry) => {
@@ -1000,13 +1342,17 @@ export function DashboardPage() {
               const badgeKey = getLedgerActionBadgeKey(entry);
               const buildingTypeId = getLedgerBuildingTypeId(entry);
               const amountClassName =
-                tone === 'positive' ? 'text-emerald-300'
-                  : tone === 'negative' ? 'text-rose-300'
+                tone === 'positive'
+                  ? 'text-emerald-300'
+                  : tone === 'negative'
+                    ? 'text-rose-300'
                     : 'text-slate-200';
 
               const isBuildEntry = entry.actionType === 'build';
-              const isTransformStartEntry = entry.actionType === 'production_transform_started';
-              const isProductionCompletedEntry = entry.actionType === 'production_completed';
+              const isTransformStartEntry =
+                entry.actionType === 'production_transform_started';
+              const isProductionCompletedEntry =
+                entry.actionType === 'production_completed';
 
               return (
                 <div
@@ -1019,7 +1365,9 @@ export function DashboardPage() {
                     </div>
                     <div className="mt-1 text-sm text-slate-300">
                       {t(`ledger.actions.${entry.actionType}.description`, {
-                        resource: entry.resourceId ? t(`resources.${entry.resourceId}.name`) : '',
+                        resource: entry.resourceId
+                          ? t(`resources.${entry.resourceId}.name`)
+                          : '',
                         amount: formatNumber(entry.amount),
                       })}
                     </div>
@@ -1053,27 +1401,35 @@ export function DashboardPage() {
                       </div>
                     ) : (
                       <>
-                        <div className={`text-sm font-semibold ${amountClassName}`}>
+                        <div
+                          className={`text-sm font-semibold ${amountClassName}`}
+                        >
                           {signedAmount.sign}
                           {amountDisplayKind === 'currency'
                             ? formatCurrency(signedAmount.absoluteAmount)
                             : formatNumber(signedAmount.absoluteAmount)}
                         </div>
                         {toneLabelKey ? (
-                          <div className={`mt-1 text-[10px] font-semibold uppercase tracking-wide ${amountClassName}`}>
+                          <div
+                            className={`mt-1 text-[10px] font-semibold uppercase tracking-wide ${amountClassName}`}
+                          >
                             {t(toneLabelKey)}
                           </div>
                         ) : null}
                       </>
                     )}
-                    <div className="mt-1 text-xs text-slate-400">{formatDate(entry.createdAt)}</div>
+                    <div className="mt-1 text-xs text-slate-400">
+                      {formatDate(entry.createdAt)}
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="mt-3 text-sm text-slate-300">{t('dashboard.emptyLedger')}</div>
+          <div className="mt-3 text-sm text-slate-300">
+            {t('dashboard.emptyLedger')}
+          </div>
         )}
       </PageCard>
 
@@ -1083,15 +1439,26 @@ export function DashboardPage() {
         {news.length > 0 ? (
           <div className="mt-3 space-y-3">
             {news.map((item) => (
-              <div key={item.id} className="rounded-xl border border-slate-800 px-3 py-3">
-                <div className="text-sm font-medium text-slate-50">{t(item.headlineKey)}</div>
-                <div className="mt-1 text-sm text-slate-300">{t(item.bodyKey)}</div>
-                <div className="mt-2 text-xs text-slate-400">{formatDate(item.createdAt)}</div>
+              <div
+                key={item.id}
+                className="rounded-xl border border-slate-800 px-3 py-3"
+              >
+                <div className="text-sm font-medium text-slate-50">
+                  {t(item.headlineKey)}
+                </div>
+                <div className="mt-1 text-sm text-slate-300">
+                  {t(item.bodyKey)}
+                </div>
+                <div className="mt-2 text-xs text-slate-400">
+                  {formatDate(item.createdAt)}
+                </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="mt-3 text-sm text-slate-300">{t('dashboard.emptyNews')}</div>
+          <div className="mt-3 text-sm text-slate-300">
+            {t('dashboard.emptyNews')}
+          </div>
         )}
       </PageCard>
     </div>
