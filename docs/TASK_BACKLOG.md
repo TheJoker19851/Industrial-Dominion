@@ -16,7 +16,7 @@
 
 ## Active
 
-No active task.
+No active tasks.
 
 ## Ready (Next)
 
@@ -32,6 +32,9 @@ No later tasks.
 
 ## Completed (Recent)
 
+- TASK-068 — Execute PROCESS_THEN_TRANSPORT_AND_SELL MVP — Status: done
+- TASK-067 — Execute TRANSPORT_AND_SELL MVP — Status: done
+- TASK-066 — Local Execution Consistency Pass — Status: done
 - TASK-065 — Execute PROCESS_AND_SELL_LOCAL MVP — Status: done
 - TASK-061 — Market Signal Layer (Test Coverage) — Status: done
 - TASK-060 — VIP Analysis Tool (Test Coverage) — Status: done

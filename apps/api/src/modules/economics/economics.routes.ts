@@ -157,6 +157,7 @@ export const economicsRoutes: FastifyPluginAsync = async (app) => {
     resource: z.enum(resourceIds),
     quantity: z.number().int().positive(),
     region: z.enum(starterRegionIds),
+    destinationRegion: z.enum(starterRegionIds).optional(),
   });
 
   app.post(
@@ -181,6 +182,7 @@ export const economicsRoutes: FastifyPluginAsync = async (app) => {
           resource: parsed.data.resource,
           quantity: parsed.data.quantity,
           region: parsed.data.region,
+          destinationRegion: parsed.data.destinationRegion,
         });
       } catch (error) {
         const message =
@@ -193,7 +195,9 @@ export const economicsRoutes: FastifyPluginAsync = async (app) => {
           message === 'Not enough inventory to execute decision.' ||
           message === 'No recipe found for resource.' ||
           message === 'Input quantity too low for processing.' ||
-          message === 'Output resource is not tradable.'
+          message === 'Output resource is not tradable.' ||
+          message === 'Destination region is required for transport strategies.' ||
+          message === 'Origin and destination regions must be different.'
             ? 400
             : 500;
 

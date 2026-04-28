@@ -654,6 +654,7 @@ describe('TASK-059: Decision Execute & History — Integration', () => {
     expect(body).toHaveProperty('region', 'ironridge');
     expect(body).toHaveProperty('netAmount');
     expect(body).toHaveProperty('playerCredits');
+    expect(body).toHaveProperty('priceBasis', 'market_context');
   });
 
   it('executes a PROCESS_AND_SELL_LOCAL decision via POST /decision-execute', async () => {
@@ -665,15 +666,15 @@ describe('TASK-059: Decision Execute & History — Integration', () => {
         {
           decision_id: 'dec-process-001',
           order_id: 'ord-process-001',
-          price_per_unit: 42,
-          gross_amount: 252,
+          price_per_unit: 39,
+          gross_amount: 234,
           fee_amount: 6,
-          net_amount: 246,
+          net_amount: 228,
           input_consumed: 12,
           output_produced: 6,
           output_resource_id: 'iron_ingot',
           inventory_quantity: 12,
-          player_credits: 5246,
+          player_credits: 5228,
         },
       ],
       error: null,
@@ -713,8 +714,9 @@ describe('TASK-059: Decision Execute & History — Integration', () => {
     expect(body).toHaveProperty('outputResourceId', 'iron_ingot');
     expect(body).toHaveProperty('inputConsumed', 12);
     expect(body).toHaveProperty('outputProduced', 6);
-    expect(body).toHaveProperty('netAmount', 246);
-    expect(body).toHaveProperty('playerCredits', 5246);
+    expect(body).toHaveProperty('netAmount', 228);
+    expect(body).toHaveProperty('playerCredits', 5228);
+    expect(body).toHaveProperty('priceBasis', 'market_context');
 
     expect(mockRpc).toHaveBeenCalledWith(
       'execute_decision_process_and_sell_local',
@@ -723,6 +725,7 @@ describe('TASK-059: Decision Execute & History — Integration', () => {
         p_input_amount: 24,
         p_output_resource_id: 'iron_ingot',
         p_output_amount: 12,
+        p_price_per_unit: expect.any(Number),
       }),
     );
   });
@@ -754,7 +757,7 @@ describe('TASK-059: Decision Execute & History — Integration', () => {
     expect(response.json()).toHaveProperty('error', 'Bad Request');
   });
 
-  it('records TRANSPORT_AND_SELL strategy as recorded (not executed)', async () => {
+  it('TRANSPORT_AND_SELL without destinationRegion returns 400 (now requires destination)', async () => {
     vi.spyOn(supabaseClient, 'createSupabaseAdminClient').mockReturnValue(
       createExecuteMock(),
     );
@@ -777,13 +780,246 @@ describe('TASK-059: Decision Execute & History — Integration', () => {
       },
     });
 
-    expect(response.statusCode).toBe(200);
-    const body = response.json();
-    expect(body).toHaveProperty('decisionId', 'pending');
-    expect(body).toHaveProperty('strategy', 'TRANSPORT_AND_SELL');
+    expect(response.statusCode).toBe(400);
   });
 
-  it('records PROCESS_THEN_TRANSPORT_AND_SELL strategy as recorded', async () => {
+  it('executes TRANSPORT_AND_SELL via POST /decision-execute', async () => {
+    const transportMock = createExecuteMock();
+    const mockRpc = vi.fn().mockResolvedValue({
+      data: [
+        {
+          decision_id: 'dec-transport-001',
+          order_id: 'ord-transport-001',
+          price_per_unit: 17,
+          gross_amount: 170,
+          fee_amount: 4,
+          transport_cost: 30,
+          net_amount: 136,
+          inventory_quantity: 0,
+          player_credits: 5136,
+          destination_region: 'greenhaven',
+        },
+      ],
+      error: null,
+    });
+
+    vi.spyOn(supabaseClient, 'createSupabaseAdminClient').mockReturnValue({
+      ...transportMock,
+      from: transportMock.from.bind(transportMock),
+      rpc: mockRpc,
+    } as unknown as ReturnType<typeof supabaseClient.createSupabaseAdminClient>);
+    vi.spyOn(supabaseClient, 'createSupabaseAuthClient').mockReturnValue({
+      auth: {},
+    } as unknown as ReturnType<typeof supabaseClient.createSupabaseAuthClient>);
+
+    const app = buildApp();
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/economics/decision-execute',
+      headers: { authorization: 'Bearer valid-token' },
+      payload: {
+        strategy: 'TRANSPORT_AND_SELL',
+        resource: 'iron_ore',
+        quantity: 10,
+        region: 'ironridge',
+        destinationRegion: 'greenhaven',
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body).toHaveProperty('decisionId', 'dec-transport-001');
+    expect(body).toHaveProperty('strategy', 'TRANSPORT_AND_SELL');
+    expect(body).toHaveProperty('transportCost', 30);
+    expect(body).toHaveProperty('destinationRegion', 'greenhaven');
+    expect(body).toHaveProperty('priceBasis', 'market_context');
+    expect(body).toHaveProperty('netAmount', 136);
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      'execute_decision_transport_and_sell',
+      expect.objectContaining({
+        p_destination_region: 'greenhaven',
+        p_transport_cost: expect.any(Number),
+        p_price_per_unit: expect.any(Number),
+      }),
+    );
+  });
+
+  it('returns 400 for TRANSPORT_AND_SELL with same origin and destination', async () => {
+    vi.spyOn(supabaseClient, 'createSupabaseAdminClient').mockReturnValue(
+      createExecuteMock(),
+    );
+    vi.spyOn(supabaseClient, 'createSupabaseAuthClient').mockReturnValue({
+      auth: {},
+    } as unknown as ReturnType<typeof supabaseClient.createSupabaseAuthClient>);
+
+    const app = buildApp();
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/economics/decision-execute',
+      headers: { authorization: 'Bearer valid-token' },
+      payload: {
+        strategy: 'TRANSPORT_AND_SELL',
+        resource: 'iron_ore',
+        quantity: 10,
+        region: 'ironridge',
+        destinationRegion: 'ironridge',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toHaveProperty('error', 'Bad Request');
+  });
+
+  it('TRANSPORT_AND_SELL computes transport cost from shared logistics', async () => {
+    const transportMock = createExecuteMock();
+    const mockRpc = vi.fn().mockResolvedValue({
+      data: [
+        {
+          decision_id: 'dec-tcost-001',
+          order_id: 'ord-tcost-001',
+          price_per_unit: 17,
+          gross_amount: 170,
+          fee_amount: 4,
+          transport_cost: 20,
+          net_amount: 146,
+          inventory_quantity: 0,
+          player_credits: 5146,
+          destination_region: 'greenhaven',
+        },
+      ],
+      error: null,
+    });
+
+    vi.spyOn(supabaseClient, 'createSupabaseAdminClient').mockReturnValue({
+      ...transportMock,
+      from: transportMock.from.bind(transportMock),
+      rpc: mockRpc,
+    } as unknown as ReturnType<typeof supabaseClient.createSupabaseAdminClient>);
+    vi.spyOn(supabaseClient, 'createSupabaseAuthClient').mockReturnValue({
+      auth: {},
+    } as unknown as ReturnType<typeof supabaseClient.createSupabaseAuthClient>);
+
+    const app = buildApp();
+    appsToClose.push(app);
+
+    await app.inject({
+      method: 'POST',
+      url: '/economics/decision-execute',
+      headers: { authorization: 'Bearer valid-token' },
+      payload: {
+        strategy: 'TRANSPORT_AND_SELL',
+        resource: 'iron_ore',
+        quantity: 10,
+        region: 'ironridge',
+        destinationRegion: 'greenhaven',
+      },
+    });
+
+    const callArgs = mockRpc.mock.calls[0][1] as { p_transport_cost: number };
+    expect(callArgs.p_transport_cost).toBeGreaterThan(0);
+  });
+
+  it('PROCESS_THEN_TRANSPORT_AND_SELL is now executable (not recorded)', async () => {
+    const ptMock = createExecuteMock();
+    const mockRpc = vi.fn().mockResolvedValue({
+      data: [
+        {
+          decision_id: 'dec-pt-001',
+          order_id: 'ord-pt-001',
+          price_per_unit: 39,
+          gross_amount: 234,
+          fee_amount: 6,
+          transport_cost: 30,
+          net_amount: 198,
+          input_consumed: 24,
+          output_produced: 12,
+          output_resource_id: 'iron_ingot',
+          inventory_quantity: 0,
+          player_credits: 5198,
+          destination_region: 'greenhaven',
+        },
+      ],
+      error: null,
+    });
+
+    let resourcesQueried: string[] = [];
+    const wrappedFrom = (table: string) => {
+      if (table === 'resources') {
+        let selectedId = '';
+        const query = {
+          eq: vi.fn((col: string, val: string) => {
+            if (col === 'id') selectedId = val;
+            return query;
+          }),
+          in: vi.fn(() => ({
+            returns: vi.fn().mockResolvedValue({ data: ALL_RESOURCES, error: null }),
+          })),
+          maybeSingle: vi.fn().mockImplementation(() => {
+            resourcesQueried.push(selectedId);
+            const r = ALL_RESOURCES.find((entry) => entry.id === selectedId);
+            return Promise.resolve({ data: r ?? null, error: null });
+          }),
+        };
+        return { select: vi.fn().mockReturnValue(query) };
+      }
+      return (ptMock as { from: (t: string) => unknown }).from(table);
+    };
+
+    vi.spyOn(supabaseClient, 'createSupabaseAdminClient').mockReturnValue({
+      ...ptMock,
+      from: wrappedFrom,
+      rpc: mockRpc,
+    } as unknown as ReturnType<typeof supabaseClient.createSupabaseAdminClient>);
+    vi.spyOn(supabaseClient, 'createSupabaseAuthClient').mockReturnValue({
+      auth: {},
+    } as unknown as ReturnType<typeof supabaseClient.createSupabaseAuthClient>);
+
+    const app = buildApp();
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/economics/decision-execute',
+      headers: { authorization: 'Bearer valid-token' },
+      payload: {
+        strategy: 'PROCESS_THEN_TRANSPORT_AND_SELL',
+        resource: 'iron_ore',
+        quantity: 24,
+        region: 'ironridge',
+        destinationRegion: 'greenhaven',
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body).toHaveProperty('strategy', 'PROCESS_THEN_TRANSPORT_AND_SELL');
+    expect(body).toHaveProperty('outputResourceId', 'iron_ingot');
+    expect(body).toHaveProperty('inputConsumed', 24);
+    expect(body).toHaveProperty('outputProduced', 12);
+    expect(body).toHaveProperty('transportCost', 30);
+    expect(body).toHaveProperty('destinationRegion', 'greenhaven');
+    expect(body).toHaveProperty('netAmount', 198);
+    expect(body).toHaveProperty('priceBasis', 'market_context');
+
+    expect(resourcesQueried).toContain('iron_ingot');
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      'execute_decision_process_transport_and_sell',
+      expect.objectContaining({
+        p_destination_region: 'greenhaven',
+        p_transport_cost: expect.any(Number),
+        p_price_per_unit: expect.any(Number),
+        p_output_resource_id: 'iron_ingot',
+      }),
+    );
+  });
+
+  it('PROCESS_THEN_TRANSPORT_AND_SELL requires destinationRegion', async () => {
     vi.spyOn(supabaseClient, 'createSupabaseAdminClient').mockReturnValue(
       createExecuteMock(),
     );
@@ -806,10 +1042,8 @@ describe('TASK-059: Decision Execute & History — Integration', () => {
       },
     });
 
-    expect(response.statusCode).toBe(200);
-    const body = response.json();
-    expect(body).toHaveProperty('decisionId', 'pending');
-    expect(body).toHaveProperty('strategy', 'PROCESS_THEN_TRANSPORT_AND_SELL');
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toHaveProperty('error', 'Bad Request');
   });
 
   it('returns 400 for invalid decision execute payload', async () => {
@@ -987,6 +1221,137 @@ describe('TASK-059: Decision Execute & History — Integration', () => {
     expect(body.history[0].result).toHaveProperty('outputProduced', 12);
     expect(body.history[0].result).toHaveProperty('outputResourceId', 'iron_ingot');
     expect(body.history[1]).toHaveProperty('strategy', 'SELL_LOCAL');
+  });
+
+  it('SELL_LOCAL execution passes market-context price to RPC', async () => {
+    const execMock = createExecuteMock();
+    const mockRpc = vi.fn().mockResolvedValue({
+      data: [
+        {
+          decision_id: 'dec-price-001',
+          order_id: 'ord-price-001',
+          price_per_unit: 17,
+          gross_amount: 170,
+          fee_amount: 4,
+          net_amount: 166,
+          inventory_quantity: 0,
+          player_credits: 5166,
+        },
+      ],
+      error: null,
+    });
+
+    vi.spyOn(supabaseClient, 'createSupabaseAdminClient').mockReturnValue({
+      ...execMock,
+      from: execMock.from.bind(execMock),
+      rpc: mockRpc,
+    } as unknown as ReturnType<typeof supabaseClient.createSupabaseAdminClient>);
+    vi.spyOn(supabaseClient, 'createSupabaseAuthClient').mockReturnValue({
+      auth: {},
+    } as unknown as ReturnType<typeof supabaseClient.createSupabaseAuthClient>);
+
+    const app = buildApp();
+    appsToClose.push(app);
+
+    await app.inject({
+      method: 'POST',
+      url: '/economics/decision-execute',
+      headers: { authorization: 'Bearer valid-token' },
+      payload: {
+        strategy: 'SELL_LOCAL',
+        resource: 'iron_ore',
+        quantity: 10,
+        region: 'ironridge',
+      },
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      'execute_decision_sell_local',
+      expect.objectContaining({
+        p_price_per_unit: expect.any(Number),
+      }),
+    );
+
+    const callArgs = mockRpc.mock.calls[0][1] as { p_price_per_unit: number };
+    expect(callArgs.p_price_per_unit).toBeLessThan(18);
+    expect(callArgs.p_price_per_unit).toBeGreaterThan(0);
+  });
+
+  it('PROCESS_AND_SELL_LOCAL execution fetches output resource for pricing', async () => {
+    const execMock = createExecuteMock();
+    let resourcesQueried: string[] = [];
+
+    const wrappedFrom = (table: string) => {
+      if (table === 'resources') {
+        let selectedId = '';
+        const query = {
+          eq: vi.fn((col: string, val: string) => {
+            if (col === 'id') selectedId = val;
+            return query;
+          }),
+          in: vi.fn(() => ({
+            returns: vi.fn().mockResolvedValue({ data: ALL_RESOURCES, error: null }),
+          })),
+          maybeSingle: vi.fn().mockImplementation(() => {
+            resourcesQueried.push(selectedId);
+            const r = ALL_RESOURCES.find((entry) => entry.id === selectedId);
+            return Promise.resolve({ data: r ?? null, error: null });
+          }),
+        };
+        return { select: vi.fn().mockReturnValue(query) };
+      }
+      return (execMock as { from: (t: string) => unknown }).from(table);
+    };
+
+    const mockRpc = vi.fn().mockResolvedValue({
+      data: [
+        {
+          decision_id: 'dec-output-001',
+          order_id: 'ord-output-001',
+          price_per_unit: 39,
+          gross_amount: 234,
+          fee_amount: 6,
+          net_amount: 228,
+          input_consumed: 24,
+          output_produced: 12,
+          output_resource_id: 'iron_ingot',
+          inventory_quantity: 0,
+          player_credits: 5228,
+        },
+      ],
+      error: null,
+    });
+
+    vi.spyOn(supabaseClient, 'createSupabaseAdminClient').mockReturnValue({
+      ...execMock,
+      from: wrappedFrom,
+      rpc: mockRpc,
+    } as unknown as ReturnType<typeof supabaseClient.createSupabaseAdminClient>);
+    vi.spyOn(supabaseClient, 'createSupabaseAuthClient').mockReturnValue({
+      auth: {},
+    } as unknown as ReturnType<typeof supabaseClient.createSupabaseAuthClient>);
+
+    const app = buildApp();
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/economics/decision-execute',
+      headers: { authorization: 'Bearer valid-token' },
+      payload: {
+        strategy: 'PROCESS_AND_SELL_LOCAL',
+        resource: 'iron_ore',
+        quantity: 24,
+        region: 'ironridge',
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(resourcesQueried).toContain('iron_ingot');
+
+    const callArgs = mockRpc.mock.calls[0][1] as { p_price_per_unit: number };
+    expect(callArgs.p_price_per_unit).toBeLessThan(42);
+    expect(callArgs.p_price_per_unit).toBeGreaterThan(0);
   });
 });
 

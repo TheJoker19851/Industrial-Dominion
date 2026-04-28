@@ -75,8 +75,12 @@ export function EconomicDecisionPanel({
   });
 
   const executeMutation = useMutation({
-    mutationFn: (strategy: StrategyResult) =>
-      executeDecision({
+    mutationFn: (strategy: StrategyResult) => {
+      const destRegion = strategy.strategy === 'TRANSPORT_AND_SELL' ||
+        strategy.strategy === 'PROCESS_THEN_TRANSPORT_AND_SELL'
+        ? (strategy.breakdown as { destinationRegion: RegionId }).destinationRegion
+        : undefined;
+      return executeDecision({
         accessToken,
         strategy: strategy.strategy as
           | 'SELL_LOCAL'
@@ -86,7 +90,9 @@ export function EconomicDecisionPanel({
         resource: strategy.resource,
         quantity: strategy.quantity,
         region: strategy.region,
-      }),
+        destinationRegion: destRegion,
+      });
+    },
     onSuccess: (data) => {
       setExecutionResult(data);
       queryClient.invalidateQueries({ queryKey: ['decision-history'] });
@@ -142,7 +148,7 @@ export function EconomicDecisionPanel({
   ) => {
     const steps = getActionSteps(strategy, { t, formatNumber });
     const isPreparing = preparingStrategy === strategy;
-    const isExecutable = strategy.strategy === 'SELL_LOCAL' || strategy.strategy === 'PROCESS_AND_SELL_LOCAL';
+    const isExecutable = strategy.strategy === 'SELL_LOCAL' || strategy.strategy === 'PROCESS_AND_SELL_LOCAL' || strategy.strategy === 'TRANSPORT_AND_SELL' || strategy.strategy === 'PROCESS_THEN_TRANSPORT_AND_SELL';
 
     return (
       <div
@@ -307,6 +313,14 @@ export function EconomicDecisionPanel({
                   <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <span className="text-slate-500">
+                        {t('dashboard.decisionGrossLabel')}:
+                      </span>{' '}
+                      <span className="text-slate-300">
+                        {formatCurrency(executionResult.grossAmount)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">
                         {t('dashboard.decisionNetLabel')}:
                       </span>{' '}
                       <span
@@ -335,6 +349,26 @@ export function EconomicDecisionPanel({
                         {formatCurrency(executionResult.playerCredits)}
                       </span>
                     </div>
+                    {executionResult.transportCost != null && executionResult.transportCost > 0 ? (
+                      <div>
+                        <span className="text-slate-500">
+                          {t('dashboard.decisionTransportCostLabel')}:
+                        </span>{' '}
+                        <span className="text-rose-400">
+                          -{formatCurrency(executionResult.transportCost)}
+                        </span>
+                      </div>
+                    ) : null}
+                    {executionResult.destinationRegion ? (
+                      <div>
+                        <span className="text-slate-500">
+                          {t('dashboard.decisionDestinationLabel')}:
+                        </span>{' '}
+                        <span className="text-slate-200">
+                          {t(`regions.${executionResult.destinationRegion}.name`)}
+                        </span>
+                      </div>
+                    ) : null}
                     {executionResult.inputConsumed != null && executionResult.outputProduced != null ? (
                       <div>
                         <span className="text-slate-500">
@@ -462,36 +496,63 @@ export function EconomicDecisionPanel({
           </div>
         ) : (
           <div className="mt-3 space-y-2">
-            {history.map((entry: DecisionHistoryEntry) => (
-              <div
-                key={entry.id}
-                className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/30 px-3 py-2"
-              >
-                <div className="text-xs text-slate-300">
-                  {t('dashboard.decisionHistoryEntry', {
-                    strategy: t(getStrategyLabelKey(entry.strategy)),
-                    quantity: formatNumber(entry.quantity),
-                    resource: t(`resources.${entry.resourceId}.name`),
-                  })}
+            {history.map((entry: DecisionHistoryEntry) => {
+              const resultNet = typeof entry.result?.netAmount === 'number'
+                ? entry.result.netAmount as number
+                : null;
+              const resultOutputResource = typeof entry.result?.outputResourceId === 'string'
+                ? entry.result.outputResourceId as string
+                : null;
+              const resultInputConsumed = typeof entry.result?.inputConsumed === 'number'
+                ? entry.result.inputConsumed as number
+                : null;
+              const resultOutputProduced = typeof entry.result?.outputProduced === 'number'
+                ? entry.result.outputProduced as number
+                : null;
+
+              return (
+                <div
+                  key={entry.id}
+                  className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/30 px-3 py-2"
+                >
+                  <div className="flex items-center gap-2 text-xs text-slate-300">
+                    <span>
+                      {t('dashboard.decisionHistoryEntry', {
+                        strategy: t(getStrategyLabelKey(entry.strategy)),
+                        quantity: formatNumber(entry.quantity),
+                        resource: t(`resources.${entry.resourceId}.name`),
+                      })}
+                    </span>
+                    {resultNet !== null && (
+                      <span className={resultNet > 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                        {formatCurrency(resultNet)}
+                      </span>
+                    )}
+                    {resultInputConsumed != null && resultOutputProduced != null && resultOutputResource && (
+                      <span className="text-slate-500">
+                        {formatNumber(resultInputConsumed)}→{formatNumber(resultOutputProduced)} {t(`resources.${resultOutputResource}.name`)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        entry.status === 'executed'
+                          ? 'bg-emerald-500/10 text-emerald-400'
+                          : 'bg-slate-800 text-slate-500'
+                      }`}
+                    >
+                      {entry.status === 'executed'
+                        ? t('dashboard.decisionStatusExecuted')
+                        : t('dashboard.decisionStatusRecorded')}
+                    </span>
+                    <span className="text-[10px] text-slate-600">
+                      {new Date(entry.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      entry.status === 'executed'
-                        ? 'bg-emerald-500/10 text-emerald-400'
-                        : 'bg-slate-800 text-slate-500'
-                    }`}
-                  >
-                    {entry.status === 'executed'
-                      ? t('dashboard.decisionStatusExecuted')
-                      : t('dashboard.decisionStatusRecorded')}
-                  </span>
-                  <span className="text-[10px] text-slate-600">
-                    {new Date(entry.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

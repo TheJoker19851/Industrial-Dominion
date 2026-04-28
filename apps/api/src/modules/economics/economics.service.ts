@@ -9,6 +9,7 @@ import type {
 import {
   buildEconomicDecisionSnapshot,
   calculateSlippageQuote,
+  calculateTransportCost,
   resourceLiquidityConfig,
   starterTransformRecipes,
 } from '@industrial-dominion/shared';
@@ -390,6 +391,36 @@ export interface DecisionExecutionResult {
   outputResourceId?: ResourceId;
   inputConsumed?: number;
   outputProduced?: number;
+  transportCost?: number;
+  destinationRegion?: RegionId;
+  priceBasis?: string;
+}
+
+function computeExecutionSellQuote(params: {
+  resourceId: ResourceId;
+  regionId: RegionId;
+  basePrice: number;
+  quantity: number;
+}): { effectiveAvgPrice: number; totalGross: number; slippageBps: number } {
+  const contextPrice = getMarketContextPrice({
+    contextKey: 'region_anchor',
+    regionId: params.regionId,
+    resourceId: params.resourceId,
+    basePrice: params.basePrice,
+    side: 'sell',
+  });
+  const anchorPrice = applyInstantTradeSpread(contextPrice.price, 'sell');
+  const slippage = calculateSlippageQuote({
+    anchorPrice,
+    quantity: params.quantity,
+    side: 'sell',
+    resourceId: params.resourceId,
+  });
+  return {
+    effectiveAvgPrice: slippage.effectiveAvgPrice,
+    totalGross: slippage.totalGross,
+    slippageBps: slippage.slippageBps,
+  };
 }
 
 export async function executeDecision(
@@ -400,6 +431,7 @@ export async function executeDecision(
     resource: ResourceId;
     quantity: number;
     region: RegionId;
+    destinationRegion?: RegionId;
   },
 ): Promise<DecisionExecutionResult> {
   const supabase = app.getSupabaseAdminClient();
@@ -439,6 +471,31 @@ export async function executeDecision(
     const inputUsed = batches * recipe.inputAmount;
     const outputProduced = batches * recipe.outputAmount;
 
+    const { data: outputResourceRow, error: outputResourceError } = await supabase
+      .from('resources')
+      .select('id, base_price, tradable')
+      .eq('id', recipe.outputResourceId)
+      .maybeSingle<ResourceRow>();
+
+    if (outputResourceError) {
+      throw new Error(`Failed to load output resource: ${outputResourceError.message}`);
+    }
+
+    if (!outputResourceRow) {
+      throw new Error('Output resource not found.');
+    }
+
+    if (!outputResourceRow.tradable) {
+      throw new Error('Output resource is not tradable.');
+    }
+
+    const sellQuote = computeExecutionSellQuote({
+      resourceId: recipe.outputResourceId,
+      regionId: input.region,
+      basePrice: outputResourceRow.base_price,
+      quantity: outputProduced,
+    });
+
     type ProcessResult = {
       decision_id: string;
       order_id: string;
@@ -463,6 +520,7 @@ export async function executeDecision(
         p_original_quantity: input.quantity,
         p_origin_region: input.region,
         p_fee_rate: gameConfig.marketFee,
+        p_price_per_unit: sellQuote.effectiveAvgPrice,
       });
 
     if (processRpcError) {
@@ -494,10 +552,18 @@ export async function executeDecision(
       resource: input.resource,
       quantity: input.quantity,
       region: input.region,
+      priceBasis: 'market_context',
     };
   }
 
   if (input.strategy === 'SELL_LOCAL') {
+    const sellQuote = computeExecutionSellQuote({
+      resourceId: input.resource,
+      regionId: input.region,
+      basePrice: resourceRow.base_price,
+      quantity: input.quantity,
+    });
+
     type ExecuteResult = {
       decision_id: string;
       order_id: string;
@@ -517,6 +583,7 @@ export async function executeDecision(
         p_quantity: input.quantity,
         p_origin_region: input.region,
         p_fee_rate: gameConfig.marketFee,
+        p_price_per_unit: sellQuote.effectiveAvgPrice,
       },
     );
 
@@ -546,6 +613,208 @@ export async function executeDecision(
       resource: input.resource,
       quantity: input.quantity,
       region: input.region,
+      priceBasis: 'market_context',
+    };
+  }
+
+  if (input.strategy === 'TRANSPORT_AND_SELL') {
+    if (!input.destinationRegion) {
+      throw new Error('Destination region is required for transport strategies.');
+    }
+
+    if (input.destinationRegion === input.region) {
+      throw new Error('Origin and destination regions must be different.');
+    }
+
+    const transportCost = calculateTransportCost({
+      quantity: input.quantity,
+      originRegion: input.region,
+      destinationRegion: input.destinationRegion,
+    });
+
+    const sellQuote = computeExecutionSellQuote({
+      resourceId: input.resource,
+      regionId: input.destinationRegion,
+      basePrice: resourceRow.base_price,
+      quantity: input.quantity,
+    });
+
+    type TransportResult = {
+      decision_id: string;
+      order_id: string;
+      price_per_unit: number;
+      gross_amount: number;
+      fee_amount: number;
+      transport_cost: number;
+      net_amount: number;
+      inventory_quantity: number;
+      player_credits: number;
+      destination_region: string;
+    };
+
+    const { data: transportRpcResult, error: transportRpcError } =
+      await supabase.rpc('execute_decision_transport_and_sell', {
+        p_player_id: input.playerId,
+        p_resource_id: input.resource,
+        p_quantity: input.quantity,
+        p_origin_region: input.region,
+        p_destination_region: input.destinationRegion,
+        p_fee_rate: gameConfig.marketFee,
+        p_price_per_unit: sellQuote.effectiveAvgPrice,
+        p_transport_cost: transportCost,
+      });
+
+    if (transportRpcError) {
+      throw new Error(transportRpcError.message);
+    }
+
+    const transportRows = transportRpcResult as TransportResult[];
+    const transportRow = Array.isArray(transportRows)
+      ? transportRows[0]
+      : (transportRows as unknown as TransportResult);
+
+    if (!transportRow) {
+      throw new Error('Decision execution returned no result.');
+    }
+
+    return {
+      decisionId: transportRow.decision_id,
+      orderId: transportRow.order_id,
+      pricePerUnit: transportRow.price_per_unit,
+      grossAmount: transportRow.gross_amount,
+      feeAmount: transportRow.fee_amount,
+      netAmount: transportRow.net_amount,
+      inventoryQuantity: transportRow.inventory_quantity,
+      playerCredits: transportRow.player_credits,
+      strategy: input.strategy,
+      resource: input.resource,
+      quantity: input.quantity,
+      region: input.region,
+      transportCost: transportRow.transport_cost,
+      destinationRegion: transportRow.destination_region as RegionId,
+      priceBasis: 'market_context',
+    };
+  }
+
+  if (input.strategy === 'PROCESS_THEN_TRANSPORT_AND_SELL') {
+    if (!input.destinationRegion) {
+      throw new Error('Destination region is required for transport strategies.');
+    }
+
+    if (input.destinationRegion === input.region) {
+      throw new Error('Origin and destination regions must be different.');
+    }
+
+    const recipe = starterTransformRecipes.find(
+      (r) => r.inputResourceId === input.resource,
+    );
+
+    if (!recipe) {
+      throw new Error('No recipe found for resource.');
+    }
+
+    const batches = Math.floor(input.quantity / recipe.inputAmount);
+    if (batches <= 0) {
+      throw new Error('Input quantity too low for processing.');
+    }
+
+    const inputUsed = batches * recipe.inputAmount;
+    const outputProduced = batches * recipe.outputAmount;
+
+    const { data: outputResourceRow, error: outputResourceError } = await supabase
+      .from('resources')
+      .select('id, base_price, tradable')
+      .eq('id', recipe.outputResourceId)
+      .maybeSingle<ResourceRow>();
+
+    if (outputResourceError) {
+      throw new Error(`Failed to load output resource: ${outputResourceError.message}`);
+    }
+
+    if (!outputResourceRow) {
+      throw new Error('Output resource not found.');
+    }
+
+    if (!outputResourceRow.tradable) {
+      throw new Error('Output resource is not tradable.');
+    }
+
+    const transportCost = calculateTransportCost({
+      quantity: outputProduced,
+      originRegion: input.region,
+      destinationRegion: input.destinationRegion,
+    });
+
+    const sellQuote = computeExecutionSellQuote({
+      resourceId: recipe.outputResourceId,
+      regionId: input.destinationRegion,
+      basePrice: outputResourceRow.base_price,
+      quantity: outputProduced,
+    });
+
+    type ProcessTransportResult = {
+      decision_id: string;
+      order_id: string;
+      price_per_unit: number;
+      gross_amount: number;
+      fee_amount: number;
+      transport_cost: number;
+      net_amount: number;
+      input_consumed: number;
+      output_produced: number;
+      output_resource_id: string;
+      inventory_quantity: number;
+      player_credits: number;
+      destination_region: string;
+    };
+
+    const { data: ptRpcResult, error: ptRpcError } =
+      await supabase.rpc('execute_decision_process_transport_and_sell', {
+        p_player_id: input.playerId,
+        p_input_resource_id: input.resource,
+        p_input_amount: inputUsed,
+        p_output_resource_id: recipe.outputResourceId,
+        p_output_amount: outputProduced,
+        p_original_quantity: input.quantity,
+        p_origin_region: input.region,
+        p_destination_region: input.destinationRegion,
+        p_fee_rate: gameConfig.marketFee,
+        p_price_per_unit: sellQuote.effectiveAvgPrice,
+        p_transport_cost: transportCost,
+      });
+
+    if (ptRpcError) {
+      throw new Error(ptRpcError.message);
+    }
+
+    const ptRows = ptRpcResult as ProcessTransportResult[];
+    const ptRow = Array.isArray(ptRows)
+      ? ptRows[0]
+      : (ptRows as unknown as ProcessTransportResult);
+
+    if (!ptRow) {
+      throw new Error('Decision execution returned no result.');
+    }
+
+    return {
+      decisionId: ptRow.decision_id,
+      orderId: ptRow.order_id,
+      pricePerUnit: ptRow.price_per_unit,
+      grossAmount: ptRow.gross_amount,
+      feeAmount: ptRow.fee_amount,
+      netAmount: ptRow.net_amount,
+      inventoryQuantity: ptRow.inventory_quantity,
+      playerCredits: ptRow.player_credits,
+      outputResourceId: ptRow.output_resource_id as ResourceId,
+      inputConsumed: ptRow.input_consumed,
+      outputProduced: ptRow.output_produced,
+      strategy: input.strategy,
+      resource: input.resource,
+      quantity: input.quantity,
+      region: input.region,
+      transportCost: ptRow.transport_cost,
+      destinationRegion: ptRow.destination_region as RegionId,
+      priceBasis: 'market_context',
     };
   }
 

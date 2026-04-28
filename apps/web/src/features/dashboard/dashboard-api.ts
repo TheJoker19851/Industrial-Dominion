@@ -29,6 +29,8 @@ export interface DecisionExecutionResult {
   outputResourceId?: ResourceId;
   inputConsumed?: number;
   outputProduced?: number;
+  transportCost?: number;
+  destinationRegion?: RegionId;
 }
 
 export interface DecisionHistoryEntry {
@@ -222,6 +224,7 @@ export function executeDecision(input: {
   resource: ResourceId;
   quantity: number;
   region: RegionId;
+  destinationRegion?: RegionId;
 }) {
   return apiRequest<DecisionExecutionResult>('/economics/decision-execute', {
     method: 'POST',
@@ -231,6 +234,7 @@ export function executeDecision(input: {
       resource: input.resource,
       quantity: input.quantity,
       region: input.region,
+      destinationRegion: input.destinationRegion,
     }),
   });
 }

@@ -388,3 +388,38 @@ Execute PROCESS_AND_SELL_LOCAL MVP — first strategy expansion beyond SELL_LOCA
 - TypeScript typecheck clean, build clean, i18n aligned
 - No duplicated economic logic — reuses `starterTransformRecipes` from shared package; execution uses base_price consistent with SELL_LOCAL pattern
 - Files modified: 0018 migration (new), economics.service.ts, economics.routes.ts, dashboard-api.ts, EconomicDecisionPanel.tsx, en/common.json, fr/common.json, economics-decision.test.ts
+
+### 2026-04-27 - TASK-066
+
+Local Execution Consistency Pass:
+
+- Replaced raw base_price execution with market-context-aware pricing using `computeExecutionSellQuote` helper for both SELL_LOCAL and PROCESS_AND_SELL_LOCAL
+- Helper applies regional modifier → instant trade spread (5%) → slippage, matching preview pipeline
+- Updated RPCs to accept `p_price_per_unit` from service layer (migration `0019_execution_price_consistency.sql`)
+- Added `priceBasis: 'market_context'` to execution results
+- Frontend shows gross amount in execution result display
+- Added EN/FR i18n key `decisionGrossLabel`
+- Added consistency tests: both strategies pass market-context price to RPC
+- All 26 economics tests pass; no regressions
+- Files modified: 0019 migration, economics.service.ts, economics.routes.ts, EconomicDecisionPanel.tsx, en/common.json, fr/common.json, economics-decision.test.ts
+
+### 2026-04-27 - TASK-067
+
+Execute TRANSPORT_AND_SELL MVP:
+
+- Created atomic RPC `execute_decision_transport_and_sell` in migration `0020_execute_decision_transport_and_sell.sql`
+- Service uses shared `calculateTransportCost` + `computeExecutionSellQuote` for destination
+- Frontend: TRANSPORT_AND_SELL shows Execute; result shows transport cost + destination
+- Added EN/FR i18n keys `decisionTransportCostLabel`, `decisionDestinationLabel`
+- All 29 economics tests pass; no regressions
+- Files modified: 0020 migration, economics.service.ts, economics.routes.ts, dashboard-api.ts, EconomicDecisionPanel.tsx, en/common.json, fr/common.json, economics-decision.test.ts
+
+### 2026-04-27 - TASK-068
+
+Execute PROCESS_THEN_TRANSPORT_AND_SELL MVP:
+
+- Created atomic RPC `execute_decision_process_transport_and_sell` in migration `0021_execute_decision_process_transport_and_sell.sql`
+- Combines recipe lookup + transport cost + destination sell quote — no duplicated logic
+- Frontend: PROCESS_THEN_TRANSPORT_AND_SELL shows Execute; result shows processing + transport + destination
+- All 30 economics tests pass; 501 total workspace tests pass (2 pre-existing failures unrelated)
+- Files modified: 0021 migration, economics.service.ts, economics.routes.ts, EconomicDecisionPanel.tsx, economics-decision.test.ts
